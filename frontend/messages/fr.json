@@ -1,0 +1,79 @@
+{
+  "status": {
+    "title": "État du Système",
+    "description": "État opérationnel actuel de tous les services",
+    "allSystemsOperational": "Tous les Systèmes Opérationnels",
+    "systemsExperiencingIssues": "Certains Systèmes Rencontrent des Problèmes",
+    "lastUpdated": "Dernière mise à jour"
+  },
+  "components": {
+    "title": "Composants",
+    "status": "État",
+    "name": "Nom",
+    "noComponents": "Aucun composant à afficher"
+  },
+  "componentStatus": {
+    "operational": "Opérationnel",
+    "degraded": "Performance Dégradée",
+    "partial_outage": "Panne Partielle",
+    "major_outage": "Panne Majeure"
+  },
+  "incidents": {
+    "title": "Incidents",
+    "active": "Incidents Actifs",
+    "past": "Incidents Passés",
+    "noIncidents": "Aucun incident à afficher",
+    "created": "Créé",
+    "updated": "Mis à jour",
+    "resolved": "Résolu"
+  },
+  "incidentStatus": {
+    "investigating": "En Investigation",
+    "identified": "Identifié",
+    "monitoring": "Surveillance",
+    "resolved": "Résolu"
+  },
+  "subscription": {
+    "title": "S'abonner aux Mises à Jour",
+    "description": "Soyez notifié lorsque nous publions des mises à jour d'état",
+    "emailPlaceholder": "Entrez votre adresse e-mail",
+    "subscribeButton": "S'abonner",
+    "subscribing": "Abonnement en cours...",
+    "successTitle": "Abonnement Réussi !",
+    "successMessage": "Veuillez vérifier votre e-mail pour confirmer votre abonnement",
+    "errorTitle": "Échec de l'Abonnement",
+    "errorMessage": "Une erreur s'est produite. Veuillez réessayer plus tard",
+    "alreadySubscribed": "Cet e-mail est déjà abonné",
+    "invalidEmail": "Veuillez entrer une adresse e-mail valide",
+    "unsubscribe": "Se désabonner",
+    "unsubscribeSuccess": "Vous avez été désabonné avec succès"
+  },
+  "language": {
+    "switchTo": "Changer de langue",
+    "english": "Anglais",
+    "french": "Français"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "retry": "Réessayer",
+    "close": "Fermer",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Soumettre",
+    "cancel": "Annuler"
+  },
+  "errors": {
+    "loadingFailed": "Échec du chargement des données",
+    "networkError": "Erreur réseau. Veuillez vérifier votre connexion",
+    "serverError": "Erreur serveur. Veuillez réessayer plus tard",
+    "notFound": "Page non trouvée"
+  },
+  "time": {
+    "justNow": "À l'instant",
+    "minutesAgo": "Il y a {count} minutes",
+    "hoursAgo": "Il y a {count} heures",
+    "daysAgo": "Il y a {count} jours",
+    "weeksAgo": "Il y a {count} semaines"
+  }
+}
