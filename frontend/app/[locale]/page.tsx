@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import ComponentStatus from '@/components/ComponentStatus';
+import IncidentTimeline from '@/components/IncidentTimeline';
 
 export default function StatusPage() {
   const t = useTranslations('status');
@@ -36,12 +37,9 @@ export default function StatusPage() {
           <ComponentStatus />
         </div>
 
-        {/* Incidents Section Placeholder */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Incidents
-          </h2>
-          <p className="text-gray-600">Recent incidents will be displayed here.</p>
+        {/* Incidents Section */}
+        <div className="mb-8">
+          <IncidentTimeline />
         </div>
       </div>
     </div>
