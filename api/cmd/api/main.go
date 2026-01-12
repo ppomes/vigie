@@ -45,9 +45,12 @@ func main() {
 		public.GET("/status", handlers.GetStatus(db))
 		public.GET("/components", handlers.GetComponents(db))
 		public.GET("/incidents", handlers.GetIncidents(db))
-		public.POST("/subscribe", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "subscription endpoint"})
-		})
+
+		// Subscription endpoints
+		public.POST("/subscribe", handlers.Subscribe(db))
+		public.GET("/confirm", handlers.Confirm(db))
+		public.GET("/unsubscribe", handlers.Unsubscribe(db))
+
 		// Authentication endpoint (public - no JWT required)
 		public.POST("/admin/login", handlers.Login(db))
 	}
