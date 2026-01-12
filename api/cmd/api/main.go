@@ -6,6 +6,7 @@ import (
 
 	"api/internal/database"
 	"api/internal/handlers"
+	"api/internal/middleware"
 	"api/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -47,30 +48,29 @@ func main() {
 		public.POST("/subscribe", func(c *gin.Context) {
 			c.JSON(200, gin.H{"message": "subscription endpoint"})
 		})
+		// Authentication endpoint (public - no JWT required)
+		public.POST("/admin/login", handlers.Login(db))
 	}
 
-	// Admin routes (protected)
+	// Admin routes (protected with JWT middleware)
 	admin := router.Group("/api/v1/admin")
-	// admin.Use(middleware.AuthRequired()) // TODO: Add when middleware is implemented
+	admin.Use(middleware.AuthRequired())
 	{
-		admin.POST("/incidents", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "create incident endpoint"})
-		})
-		admin.PUT("/incidents/:id", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "update incident endpoint"})
-		})
-		admin.DELETE("/incidents/:id", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "delete incident endpoint"})
-		})
-		admin.POST("/components", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "create component endpoint"})
-		})
-		admin.PUT("/components/:id", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "update component endpoint"})
-		})
-		admin.DELETE("/components/:id", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "delete component endpoint"})
-		})
+		// Component management
+		admin.GET("/components", handlers.ListComponents(db))
+		admin.POST("/components", handlers.CreateComponent(db))
+		admin.PUT("/components/:id", handlers.UpdateComponent(db))
+		admin.DELETE("/components/:id", handlers.DeleteComponent(db))
+
+		// Incident management
+		admin.GET("/incidents", handlers.ListIncidents(db))
+		admin.POST("/incidents", handlers.CreateIncident(db))
+		admin.PUT("/incidents/:id", handlers.UpdateIncident(db))
+		admin.DELETE("/incidents/:id", handlers.DeleteIncident(db))
+
+		// Subscriber management
+		admin.GET("/subscribers", handlers.ListSubscribers(db))
+		admin.DELETE("/subscribers/:id", handlers.DeleteSubscriber(db))
 	}
 
 	// Get port from environment or use default
