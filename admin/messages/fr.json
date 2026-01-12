@@ -1,0 +1,147 @@
+{
+  "login": {
+    "title": "Connexion Administrateur",
+    "username": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "loginButton": "Se connecter",
+    "loggingIn": "Connexion en cours...",
+    "loginFailed": "Échec de la connexion",
+    "invalidCredentials": "Nom d'utilisateur ou mot de passe invalide",
+    "welcomeBack": "Bienvenue"
+  },
+  "dashboard": {
+    "title": "Tableau de Bord",
+    "welcome": "Bienvenue dans le Panneau d'Administration",
+    "overview": "Vue d'ensemble",
+    "recentIncidents": "Incidents Récents",
+    "activeIncidents": "Incidents Actifs",
+    "totalComponents": "Composants Totaux",
+    "totalSubscribers": "Abonnés Totaux",
+    "viewAll": "Voir Tout"
+  },
+  "navigation": {
+    "dashboard": "Tableau de Bord",
+    "incidents": "Incidents",
+    "components": "Composants",
+    "subscribers": "Abonnés",
+    "settings": "Paramètres",
+    "logout": "Déconnexion"
+  },
+  "incidents": {
+    "title": "Incidents",
+    "createNew": "Créer un Nouvel Incident",
+    "editIncident": "Modifier l'Incident",
+    "deleteIncident": "Supprimer l'Incident",
+    "incidentDetails": "Détails de l'Incident",
+    "name": "Nom",
+    "status": "État",
+    "component": "Composant",
+    "message": "Message",
+    "createdAt": "Créé le",
+    "updatedAt": "Mis à jour le",
+    "noIncidents": "Aucun incident trouvé",
+    "selectComponent": "Sélectionner un composant",
+    "messageEn": "Message (Anglais)",
+    "messageFr": "Message (Français)",
+    "createSuccess": "Incident créé avec succès",
+    "updateSuccess": "Incident mis à jour avec succès",
+    "deleteSuccess": "Incident supprimé avec succès",
+    "deleteConfirm": "Êtes-vous sûr de vouloir supprimer cet incident ?",
+    "notifySubscribers": "Notifier les Abonnés",
+    "subscribersNotified": "Les abonnés seront notifiés"
+  },
+  "incidentStatus": {
+    "investigating": "En Investigation",
+    "identified": "Identifié",
+    "monitoring": "Surveillance",
+    "resolved": "Résolu"
+  },
+  "components": {
+    "title": "Composants",
+    "createNew": "Créer un Nouveau Composant",
+    "editComponent": "Modifier le Composant",
+    "deleteComponent": "Supprimer le Composant",
+    "componentDetails": "Détails du Composant",
+    "name": "Nom",
+    "nameEn": "Nom (Anglais)",
+    "nameFr": "Nom (Français)",
+    "description": "Description",
+    "descriptionEn": "Description (Anglais)",
+    "descriptionFr": "Description (Français)",
+    "status": "État",
+    "noComponents": "Aucun composant trouvé",
+    "createSuccess": "Composant créé avec succès",
+    "updateSuccess": "Composant mis à jour avec succès",
+    "deleteSuccess": "Composant supprimé avec succès",
+    "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce composant ?"
+  },
+  "componentStatus": {
+    "operational": "Opérationnel",
+    "degraded": "Performance Dégradée",
+    "partial_outage": "Panne Partielle",
+    "major_outage": "Panne Majeure"
+  },
+  "subscribers": {
+    "title": "Abonnés",
+    "email": "E-mail",
+    "confirmed": "Confirmé",
+    "subscribedAt": "Abonné le",
+    "noSubscribers": "Aucun abonné trouvé",
+    "deleteSubscriber": "Supprimer l'Abonné",
+    "deleteSuccess": "Abonné supprimé avec succès",
+    "deleteConfirm": "Êtes-vous sûr de vouloir supprimer cet abonné ?",
+    "exportList": "Exporter la Liste",
+    "totalConfirmed": "Total Confirmé",
+    "totalPending": "Total en Attente"
+  },
+  "forms": {
+    "save": "Enregistrer",
+    "saving": "Enregistrement en cours...",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "deleting": "Suppression en cours...",
+    "edit": "Modifier",
+    "create": "Créer",
+    "creating": "Création en cours...",
+    "required": "Ce champ est requis",
+    "invalidEmail": "Adresse e-mail invalide",
+    "confirmAction": "Confirmer l'Action"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "retry": "Réessayer",
+    "close": "Fermer",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Soumettre",
+    "cancel": "Annuler",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "actions": "Actions",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "errors": {
+    "loadingFailed": "Échec du chargement des données",
+    "networkError": "Erreur réseau. Veuillez vérifier votre connexion",
+    "serverError": "Erreur serveur. Veuillez réessayer plus tard",
+    "notFound": "Page non trouvée",
+    "unauthorized": "Non autorisé. Veuillez vous reconnecter",
+    "forbidden": "Vous n'avez pas la permission d'effectuer cette action",
+    "validationError": "Erreur de validation. Veuillez vérifier votre saisie"
+  },
+  "time": {
+    "justNow": "À l'instant",
+    "minutesAgo": "Il y a {count} minutes",
+    "hoursAgo": "Il y a {count} heures",
+    "daysAgo": "Il y a {count} jours",
+    "weeksAgo": "Il y a {count} semaines"
+  },
+  "language": {
+    "switchTo": "Changer de langue",
+    "english": "Anglais",
+    "french": "Français"
+  }
+}
