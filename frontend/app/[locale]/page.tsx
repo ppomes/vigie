@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import ComponentStatus from '@/components/ComponentStatus';
 
 export default function StatusPage() {
   const t = useTranslations('status');
@@ -30,12 +31,9 @@ export default function StatusPage() {
           </div>
         </div>
 
-        {/* Components Section Placeholder */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Components
-          </h2>
-          <p className="text-gray-600">Component list will be displayed here.</p>
+        {/* Components Section */}
+        <div className="mb-8">
+          <ComponentStatus />
         </div>
 
         {/* Incidents Section Placeholder */}
