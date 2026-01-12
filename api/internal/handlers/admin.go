@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
 	"api/internal/models"
+	"api/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -252,7 +254,7 @@ func ListComponents(db *gorm.DB) gin.HandlerFunc {
 
 // CreateIncident handles the creation of a new incident
 // POST /api/v1/admin/incidents
-func CreateIncident(db *gorm.DB) gin.HandlerFunc {
+func CreateIncident(db *gorm.DB, notificationService *services.NotificationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req CreateIncidentRequest
 
@@ -315,6 +317,15 @@ func CreateIncident(db *gorm.DB) gin.HandlerFunc {
 		// Reload incident with translations and component
 		db.Preload("Translations").Preload("Component").First(&incident, incident.ID)
 
+		// Send notifications to subscribers (async, non-blocking)
+		if notificationService != nil {
+			go func() {
+				if err := notificationService.NotifyIncidentCreated(&incident); err != nil {
+					log.Printf("Failed to send incident creation notifications: %v", err)
+				}
+			}()
+		}
+
 		c.JSON(http.StatusCreated, gin.H{
 			"message":  "Incident created successfully",
 			"incident": incident,
@@ -324,7 +335,7 @@ func CreateIncident(db *gorm.DB) gin.HandlerFunc {
 
 // UpdateIncident handles updating an existing incident
 // PUT /api/v1/admin/incidents/:id
-func UpdateIncident(db *gorm.DB) gin.HandlerFunc {
+func UpdateIncident(db *gorm.DB, notificationService *services.NotificationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get incident ID from URL parameter
 		id, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -415,6 +426,15 @@ func UpdateIncident(db *gorm.DB) gin.HandlerFunc {
 
 		// Reload incident with translations and component
 		db.Preload("Translations").Preload("Component").First(&incident, incident.ID)
+
+		// Send notifications to subscribers (async, non-blocking)
+		if notificationService != nil {
+			go func() {
+				if err := notificationService.NotifyIncidentUpdated(&incident); err != nil {
+					log.Printf("Failed to send incident update notifications: %v", err)
+				}
+			}()
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"message":  "Incident updated successfully",

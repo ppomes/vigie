@@ -8,6 +8,7 @@ import (
 	"api/internal/handlers"
 	"api/internal/middleware"
 	"api/internal/models"
+	"api/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -34,6 +35,20 @@ func main() {
 		&models.Translation{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	// Initialize email service
+	emailService, err := services.NewEmailService()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize email service: %v", err)
+		log.Println("Notifications will not be sent. Please configure EMAIL_FROM and provider credentials.")
+	}
+
+	// Initialize notification service
+	var notificationService *services.NotificationService
+	if emailService != nil {
+		notificationService = services.NewNotificationService(db, emailService)
+		log.Println("Notification service initialized successfully")
 	}
 
 	// Create Gin router with default middleware (logger + recovery)
@@ -67,8 +82,8 @@ func main() {
 
 		// Incident management
 		admin.GET("/incidents", handlers.ListIncidents(db))
-		admin.POST("/incidents", handlers.CreateIncident(db))
-		admin.PUT("/incidents/:id", handlers.UpdateIncident(db))
+		admin.POST("/incidents", handlers.CreateIncident(db, notificationService))
+		admin.PUT("/incidents/:id", handlers.UpdateIncident(db, notificationService))
 		admin.DELETE("/incidents/:id", handlers.DeleteIncident(db))
 
 		// Subscriber management
