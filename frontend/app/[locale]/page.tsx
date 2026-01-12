@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import ComponentStatus from '@/components/ComponentStatus';
 import IncidentTimeline from '@/components/IncidentTimeline';
 import SubscriptionForm from '@/components/SubscriptionForm';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 export default function StatusPage() {
   const t = useTranslations('status');
@@ -11,6 +12,11 @@ export default function StatusPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Language Switcher */}
+        <div className="flex justify-end mb-6">
+          <LanguageSwitcher />
+        </div>
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
