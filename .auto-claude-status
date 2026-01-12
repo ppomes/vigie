@@ -1,0 +1,25 @@
+{
+  "active": true,
+  "spec": "001-i-would-like-to-create-a-software-like-cachethq-bu",
+  "state": "building",
+  "subtasks": {
+    "completed": 0,
+    "total": 51,
+    "in_progress": 1,
+    "failed": 0
+  },
+  "phase": {
+    "current": "Project Setup & Structure",
+    "id": null,
+    "total": 4
+  },
+  "workers": {
+    "active": 0,
+    "max": 1
+  },
+  "session": {
+    "number": 1,
+    "started_at": "2026-01-12T17:54:48.787023"
+  },
+  "last_update": "2026-01-12T17:54:48.856358"
+}
