@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"api/internal/database"
+	"api/internal/handlers"
 	"api/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -40,15 +41,9 @@ func main() {
 	// Public routes
 	public := router.Group("/api/v1")
 	{
-		public.GET("/status", func(c *gin.Context) {
-			c.JSON(200, gin.H{"status": "ok"})
-		})
-		public.GET("/components", func(c *gin.Context) {
-			c.JSON(200, gin.H{"components": []string{}})
-		})
-		public.GET("/incidents", func(c *gin.Context) {
-			c.JSON(200, gin.H{"incidents": []string{}})
-		})
+		public.GET("/status", handlers.GetStatus(db))
+		public.GET("/components", handlers.GetComponents(db))
+		public.GET("/incidents", handlers.GetIncidents(db))
 		public.POST("/subscribe", func(c *gin.Context) {
 			c.JSON(200, gin.H{"message": "subscription endpoint"})
 		})
