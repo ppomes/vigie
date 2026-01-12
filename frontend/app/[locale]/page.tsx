@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import ComponentStatus from '@/components/ComponentStatus';
 import IncidentTimeline from '@/components/IncidentTimeline';
+import SubscriptionForm from '@/components/SubscriptionForm';
 
 export default function StatusPage() {
   const t = useTranslations('status');
@@ -40,6 +41,11 @@ export default function StatusPage() {
         {/* Incidents Section */}
         <div className="mb-8">
           <IncidentTimeline />
+        </div>
+
+        {/* Subscription Form */}
+        <div className="mb-8">
+          <SubscriptionForm />
         </div>
       </div>
     </div>
