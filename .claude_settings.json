@@ -1,0 +1,39 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu/**)",
+      "Write(/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu/**)",
+      "Edit(/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu/**)",
+      "Glob(/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu/**)",
+      "Grep(/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu/**)",
+      "Read(/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu/.auto-claude/specs/001-i-would-like-to-create-a-software-like-cachethq-bu/**)",
+      "Write(/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu/.auto-claude/specs/001-i-would-like-to-create-a-software-like-cachethq-bu/**)",
+      "Edit(/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu/.auto-claude/specs/001-i-would-like-to-create-a-software-like-cachethq-bu/**)",
+      "Read(/Users/ppomes/src/openstatus/openstatus/.auto-claude/**)",
+      "Write(/Users/ppomes/src/openstatus/openstatus/.auto-claude/**)",
+      "Edit(/Users/ppomes/src/openstatus/openstatus/.auto-claude/**)",
+      "Glob(/Users/ppomes/src/openstatus/openstatus/.auto-claude/**)",
+      "Grep(/Users/ppomes/src/openstatus/openstatus/.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}
