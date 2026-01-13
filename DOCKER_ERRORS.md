@@ -240,10 +240,107 @@ RUN npm ci
 
 **Exit Code:** 1
 
-**Root Cause:** The `admin/package-lock.json` file does not exist. Identical issue to the frontend service - `npm ci` requires a lockfile that isn't present in the repository.
+**Root Cause Analysis:**
+
+The Admin service build fails due to a **missing package-lock.json file** in the repository. This issue is identical in nature to the Frontend service failure, as both are Next.js applications using the same Docker build strategy:
+
+1. **Missing package-lock.json File (Primary Issue)**
+   - The `admin/package-lock.json` file did not exist in the repository at build time
+   - Confirmed via repository inspection - only package.json was present
+   - package-lock.json contains exact dependency versions and integrity hashes for all packages
+   - npm's `ci` command is designed for automated environments and requires this lockfile for reproducibility
+
+2. **Dockerfile Build Strategy (Context)**
+   - The Dockerfile uses `npm ci` (clean install) instead of `npm install` for production builds
+   - This is a deliberate best practice choice for several reasons:
+     - **Speed**: `npm ci` is significantly faster than `npm install` (skips dependency resolution)
+     - **Reproducibility**: Installs exact versions from lockfile, not semver ranges from package.json
+     - **Security**: Validates package integrity using checksums in lockfile
+     - **Consistency**: Ensures identical node_modules across all environments (dev, CI, production)
+   - The Dockerfile line `COPY package.json package-lock.json* ./` uses an optional wildcard `*`
+   - This allows the build to proceed if package-lock.json is missing, but `npm ci` will fail
+
+3. **Why package-lock.json is Critical for Admin Service**
+   - **Dependency Resolution**: package.json uses semver ranges (e.g., `^15.1.0`, `^19.0.0`)
+   - Without a lockfile, different installs could get different versions (^15.1.0 could resolve to 15.1.0 OR 15.2.0)
+   - The lockfile "locks" exact versions, including all transitive dependencies
+   - The Admin service uses next-intl for internationalization, which adds additional dependency complexity
+   - For Next.js projects with 200+ dependencies, this prevents version drift and "works on my machine" issues
+
+4. **Multi-Stage Build Impact**
+   - The admin Dockerfile uses a multi-stage build pattern (identical to frontend):
+     - Stage 1 (`deps`): Install dependencies using npm ci
+     - Stage 2 (`builder`): Copy deps and build the Next.js app with `output: 'standalone'` configuration
+     - Stage 3 (`runner`): Copy build artifacts (.next/standalone, .next/static, public) to minimal production image
+   - The failure occurs in the **first stage** (`deps`), preventing any subsequent stages from executing
+   - This is a build-time error, not a runtime error
+
+5. **Admin Service-Specific Configuration**
+   - **Port Configuration**: Admin runs on port 3001 (vs Frontend on 3000)
+   - **Standalone Output**: next.config.js specifies `output: 'standalone'` for Docker optimization
+   - **Internationalization**: Uses next-intl plugin with custom i18n configuration (./i18n.ts)
+   - **Health Check**: Dockerfile includes health check on port 3001 (wget http://localhost:3001)
+   - These configurations are correctly set up in Dockerfile and next.config.js, but build fails before reaching runtime
+
+**Dependencies Affected (from admin/package.json):**
+- Production:
+  - `next: ^15.1.0` - Next.js framework
+  - `next-intl: ^3.25.2` - Internationalization library (critical for admin UI localization)
+  - `react: ^19.0.0` - React library
+  - `react-dom: ^19.0.0` - React DOM renderer
+- Development (17 packages):
+  - TypeScript, Testing libraries (@testing-library/react, @testing-library/jest-dom)
+  - Tailwind CSS (autoprefixer, postcss, tailwindcss)
+  - Vitest testing framework (@vitest/ui, jsdom, vitest)
+  - Build tools and type definitions
 
 **Dockerfile Location:** `admin/Dockerfile`
-**Dockerfile Line:** `RUN npm ci` in the `deps` stage
+**Affected Build Stage:** Line 15 - `RUN npm ci` in the `deps` stage
+
+**Proposed Fix Options:**
+
+**Option A: Generate and Commit package-lock.json (Recommended)**
+   ```bash
+   cd admin
+   npm install  # Generates package-lock.json with all resolved dependencies
+   git add package-lock.json
+   git commit -m "Add package-lock.json for admin service"
+   ```
+   **Benefits:**
+   - Ensures reproducible builds across all environments
+   - Enables faster `npm ci` installs in Docker and CI/CD
+   - Locks dependency versions for next-intl and all Next.js 15+ dependencies
+   - Follows npm and Docker best practices
+   - No Dockerfile changes needed
+   - Expected lockfileVersion: 3 (npm 7+)
+
+**Option B: Modify Dockerfile to Use npm install**
+   ```dockerfile
+   # Change in deps stage:
+   RUN npm install --production=false
+   # Or for production only:
+   RUN npm install --production
+   ```
+   **Drawbacks:**
+   - Slower builds (re-resolves dependencies every time)
+   - Non-reproducible (different builds may get different versions)
+   - Defeats the purpose of using `npm ci` in Docker
+   - Not recommended for production environments
+   - Could break due to version drift in next-intl or Next.js 15
+
+**Option C: Generate lockfile in Dockerfile**
+   ```dockerfile
+   # After copying package.json:
+   RUN npm install --package-lock-only
+   RUN npm ci
+   ```
+   **Drawbacks:**
+   - Lockfile not committed to repository (still non-reproducible)
+   - Each build generates potentially different lockfile
+   - Adds extra build step and time
+   - Not recommended for production
+
+**Recommendation:** Option A is strongly recommended. The lockfile should be generated locally and committed to version control to ensure all team members and CI/CD environments use identical dependency versions. This is especially critical for the Admin service, which uses internationalization (next-intl) and serves on a different port (3001), requiring stable and reproducible builds.
 
 ---
 
