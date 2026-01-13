@@ -8,7 +8,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import IncidentForm from '@/components/IncidentForm';
 import { createIncident } from '@/lib/api';
-import type { CreateIncidentRequest } from '@/lib/api';
+import type { CreateIncidentRequest, UpdateIncidentRequest } from '@/lib/api';
 
 export default function NewIncidentPage() {
   const router = useRouter();
@@ -16,11 +16,12 @@ export default function NewIncidentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (data: CreateIncidentRequest) => {
+  const handleSubmit = async (data: CreateIncidentRequest | UpdateIncidentRequest) => {
     try {
       setSubmitting(true);
       setError(null);
-      await createIncident(data);
+      // In create mode, the form always provides all required fields
+      await createIncident(data as CreateIncidentRequest);
       router.push('/incidents');
     } catch (err) {
       if (err instanceof Error) {
