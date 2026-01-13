@@ -3,10 +3,12 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log"
 	"net/http"
 	"strings"
 
 	"api/internal/models"
+	"api/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -25,7 +27,7 @@ type SubscribeResponse struct {
 
 // Subscribe handles email subscription requests
 // POST /api/v1/subscribe
-func Subscribe(db *gorm.DB) gin.HandlerFunc {
+func Subscribe(db *gorm.DB, emailService services.EmailService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req SubscribeRequest
 
@@ -60,8 +62,14 @@ func Subscribe(db *gorm.DB) gin.HandlerFunc {
 					return
 				}
 
-				// TODO: Send confirmation email when email service is implemented (subtask-7-2)
-				// email.SendConfirmationEmail(existingSubscriber.Email, existingSubscriber.ConfirmationToken)
+				// Send confirmation email (async, non-blocking)
+				if emailService != nil {
+					go func() {
+						if err := emailService.SendConfirmationEmail(existingSubscriber.Email, existingSubscriber.ConfirmationToken); err != nil {
+							log.Printf("Failed to send confirmation email to %s: %v", existingSubscriber.Email, err)
+						}
+					}()
+				}
 
 				c.JSON(http.StatusCreated, SubscribeResponse{
 					Message: "Subscription reactivated. Please check your email to confirm.",
@@ -79,9 +87,14 @@ func Subscribe(db *gorm.DB) gin.HandlerFunc {
 				return
 			}
 
-			// Exists but not confirmed - resend confirmation email
-			// TODO: Send confirmation email when email service is implemented (subtask-7-2)
-			// email.SendConfirmationEmail(existingSubscriber.Email, existingSubscriber.ConfirmationToken)
+			// Exists but not confirmed - resend confirmation email (async, non-blocking)
+			if emailService != nil {
+				go func() {
+					if err := emailService.SendConfirmationEmail(existingSubscriber.Email, existingSubscriber.ConfirmationToken); err != nil {
+						log.Printf("Failed to resend confirmation email to %s: %v", existingSubscriber.Email, err)
+					}
+				}()
+			}
 
 			c.JSON(http.StatusOK, SubscribeResponse{
 				Message: "Confirmation email has been resent. Please check your email.",
@@ -119,8 +132,14 @@ func Subscribe(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// TODO: Send confirmation email when email service is implemented (subtask-7-2)
-		// email.SendConfirmationEmail(subscriber.Email, subscriber.ConfirmationToken)
+		// Send confirmation email (async, non-blocking)
+		if emailService != nil {
+			go func() {
+				if err := emailService.SendConfirmationEmail(subscriber.Email, subscriber.ConfirmationToken); err != nil {
+					log.Printf("Failed to send confirmation email to %s: %v", subscriber.Email, err)
+				}
+			}()
+		}
 
 		c.JSON(http.StatusCreated, SubscribeResponse{
 			Message: "Subscription created. Please check your email to confirm.",

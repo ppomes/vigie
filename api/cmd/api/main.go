@@ -62,7 +62,7 @@ func main() {
 		public.GET("/incidents", handlers.GetIncidents(db))
 
 		// Subscription endpoints
-		public.POST("/subscribe", handlers.Subscribe(db))
+		public.POST("/subscribe", handlers.Subscribe(db, emailService))
 		public.GET("/confirm", handlers.Confirm(db))
 		public.GET("/unsubscribe", handlers.Unsubscribe(db))
 
