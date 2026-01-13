@@ -46,15 +46,63 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api/mai
 
 **Exit Code:** 1
 
-**Root Cause:** The `go.sum` file is either missing or incomplete. It doesn't contain cryptographic checksums for the following required dependencies:
-- `gorm.io/driver/mysql` - MySQL driver for GORM
-- `gorm.io/gorm` - GORM ORM library
-- `golang.org/x/crypto/bcrypt` - Password hashing
-- `github.com/gin-gonic/gin` - HTTP web framework
-- `github.com/golang-jwt/jwt/v5` - JWT authentication
-- `github.com/joho/godotenv` - Environment variable loader
+**Root Cause Analysis:**
+
+The API service build fails due to a **missing go.sum file** combined with an **incomplete dependency declaration** in go.mod. This is a three-part issue:
+
+1. **Missing go.sum File (Primary Issue)**
+   - The `api/go.sum` file does not exist in the repository
+   - Confirmed via `ls -la api/` - only go.mod is present
+   - go.sum contains cryptographic checksums for all dependencies and their transitive dependencies
+   - Go's build system requires go.sum for security and reproducibility
+
+2. **Incomplete go.mod Declaration (Secondary Issue)**
+   - The package `golang.org/x/crypto/bcrypt` is directly imported in `api/internal/models/user.go:6`
+   - However, it is NOT declared in the `require` section of `api/go.mod`
+   - This is a direct dependency (not transitive) and must be explicitly declared
+   - Current go.mod only lists 6 packages, missing this critical crypto dependency
+
+3. **Dockerfile Build Flow Limitation (Contributing Factor)**
+   - The Dockerfile copies go.mod and attempts to copy go.sum with optional wildcard: `COPY go.sum* ./`
+   - Then runs `RUN go mod download` expecting it to create go.sum
+   - **However**: `go mod download` only downloads modules listed in go.mod; it does NOT create a complete go.sum file with all checksums
+   - The go.sum file is only created/updated when running: `go mod tidy`, `go build`, `go test`, or `go get`
+   - When `go build` runs in the Dockerfile (line 25), it requires go.sum to already exist and be complete
+
+**Missing Dependencies Identified:**
+- `gorm.io/driver/mysql` - MySQL driver for GORM (declared in go.mod)
+- `gorm.io/gorm` - GORM ORM library (declared in go.mod)
+- `golang.org/x/crypto/bcrypt` - Password hashing (**NOT in go.mod, directly used in code**)
+- `github.com/gin-gonic/gin` - HTTP web framework (declared in go.mod)
+- `github.com/golang-jwt/jwt/v5` - JWT authentication (declared in go.mod)
+- `github.com/joho/godotenv` - Environment variable loader (declared in go.mod)
 
 **Dockerfile Location:** `api/Dockerfile`
+**Affected Build Stage:** Line 25 - `RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api/main.go`
+
+**Proposed Fix Options:**
+
+**Option A: Generate and Commit go.sum (Recommended)**
+   ```bash
+   cd api
+   go mod tidy  # This will update go.mod with missing deps and create go.sum
+   git add go.sum go.mod
+   git commit -m "Add go.sum and fix missing golang.org/x/crypto dependency"
+   ```
+   - Ensures reproducible builds
+   - Follows Go best practices
+   - No Dockerfile changes needed
+
+**Option B: Modify Dockerfile to Generate go.sum**
+   ```dockerfile
+   # After copying go.mod, add:
+   RUN go mod tidy
+   # Or after copying source code, before build:
+   RUN go mod download && go mod verify
+   ```
+   - Less secure (checksums not verified before download)
+   - Builds may not be reproducible
+   - Not recommended for production
 
 ---
 
