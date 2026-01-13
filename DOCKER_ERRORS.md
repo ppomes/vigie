@@ -350,6 +350,347 @@ The Admin service build fails due to a **missing package-lock.json file** in the
 
 ---
 
+## Docker Compose Configuration Issues
+
+While the build failures prevent testing runtime behavior, analysis of the `docker-compose.yml` file reveals several configuration issues that will cause **runtime failures** once the build errors are resolved.
+
+### Issue 1: Incorrect API URL for Frontend/Admin Services ⚠️ CRITICAL
+
+**Status:** ❌ RUNTIME FAILURE (after build is fixed)
+**Impact:** Frontend and Admin services cannot communicate with API
+
+**Problem:**
+- **Lines 94, 121:** `NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}`
+- Default value uses `localhost:8080` which does NOT work inside Docker containers
+- `NEXT_PUBLIC_API_URL` is baked into the Next.js build at **build time** (not runtime)
+- Inside containers, `localhost` refers to the container itself, not the API service
+
+**Why This Fails:**
+1. Frontend container starts and tries to fetch from `http://localhost:8080/api/v1`
+2. Port 8080 is not exposed inside the frontend container (only in the API container)
+3. Frontend cannot reach the API - all API calls fail with connection errors
+4. Same issue affects Admin service on port 3001
+
+**Evidence from .env.example:**
+```bash
+# Lines 55-58 of .env.example:
+NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+
+# For Docker Compose, use:
+# NEXT_PUBLIC_API_URL=http://api:8080/api/v1
+```
+The .env.example file explicitly documents this requirement but the docker-compose.yml doesn't follow it.
+
+**Network Configuration Context:**
+- All services are on `statuspage-network` (bridge network)
+- Services can reference each other by **service name** (e.g., `api`, `mysql`)
+- The API service is named `api` (line 33) and exposes port 8080 (line 70)
+- Correct URL should be: `http://api:8080/api/v1`
+
+**Root Cause:**
+The docker-compose.yml inherits the .env.example default value, which is designed for **local development outside Docker** (where the API runs on the host's localhost:8080). This configuration is fundamentally incompatible with Docker Compose networking.
+
+**Proposed Fix:**
+```yaml
+# Lines 94, 121 - Update both frontend and admin:
+environment:
+  NODE_ENV: ${NODE_ENV:-production}
+  NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:8080/api/v1}  # Changed from localhost
+  NEXT_TELEMETRY_DISABLED: 1
+```
+
+**Alternative Fix (requires user to update .env):**
+Document in README that users must set `NEXT_PUBLIC_API_URL=http://api:8080/api/v1` in their .env file before running docker-compose.
+
+---
+
+### Issue 2: API Health Check Endpoint Dependency
+
+**Status:** ✅ VERIFIED (endpoint exists)
+**Impact:** Startup sequence depends on this endpoint
+
+**Configuration:**
+- **Line 74:** `test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/status"]`
+- Frontend and Admin services depend on `api: condition: service_healthy` (lines 90-91, 117-118)
+- This creates a startup dependency chain: MySQL → API → Frontend/Admin
+
+**Verification:**
+The `/api/v1/status` endpoint **is correctly implemented** in `api/cmd/api/main.go:60`:
+```go
+public.GET("/status", handlers.GetStatus(db))
+```
+
+**Startup Sequence:**
+1. MySQL container starts and becomes healthy (30 second start_period)
+2. API container waits for MySQL health check to pass
+3. API container starts and becomes healthy (40 second start_period)
+4. Frontend and Admin containers wait for API health check to pass
+5. Frontend and Admin containers start
+
+**Potential Issues:**
+- If the status endpoint fails (e.g., database connection issues), the API never becomes healthy
+- Frontend and Admin will never start if API doesn't become healthy
+- Total startup time: MySQL (30s) + API (40s) + Frontend/Admin (40s) = ~110 seconds minimum
+- Health check failures will be logged but may not be immediately visible to users
+
+**Recommendation:**
+This configuration is **correct as-is** for production deployments. The health check ensures services only start when dependencies are ready. No changes needed, but startup time should be documented.
+
+---
+
+### Issue 3: Migration Strategy and Volume Mount
+
+**Status:** ⚠️ DUAL MIGRATION SYSTEM (may cause conflicts)
+**Impact:** Database migrations may run twice or conflict
+
+**Configuration:**
+- **Line 20:** `- ./api/migrations:/docker-entrypoint-initdb.d:ro`
+- MySQL container mounts migrations directory for automatic initialization
+
+**Migration Implementation Analysis:**
+The system uses **two migration approaches simultaneously**:
+
+1. **MySQL Container Init (docker-entrypoint-initdb.d):**
+   - SQL file: `api/migrations/001_initial_schema.sql` (6.3KB)
+   - Runs automatically when MySQL container first starts
+   - Only executes on **empty database** (first run only)
+   - Creates schema using SQL DDL statements
+
+2. **GORM AutoMigrate (Application Startup):**
+   - Code: `api/cmd/api/main.go:30-38`
+   - Runs every time the API application starts
+   - Migrates 5 models: User, Component, Incident, Subscriber, Translation
+   - Uses GORM's schema migration logic (may differ from SQL)
+
+**Potential Conflicts:**
+- If SQL migration creates tables differently than GORM expects, AutoMigrate may try to modify them
+- GORM AutoMigrate may add/remove columns that differ from SQL schema
+- Two sources of truth for schema definition
+
+**Current Behavior:**
+- **First startup (clean database):**
+  1. MySQL runs 001_initial_schema.sql → creates tables
+  2. API starts → GORM AutoMigrate checks tables → may modify them if differences exist
+
+- **Subsequent startups (existing database):**
+  1. MySQL skips migrations (database not empty)
+  2. API starts → GORM AutoMigrate runs → updates schema if models changed
+
+**Recommendation:**
+Choose **one** migration strategy:
+
+**Option A: Use Only GORM AutoMigrate**
+```yaml
+# Remove this line from docker-compose.yml:
+# - ./api/migrations:/docker-entrypoint-initdb.d:ro
+```
+Pros: Single source of truth (Go models), simpler maintenance
+Cons: Loses SQL migration history, harder to review schema changes
+
+**Option B: Use Only SQL Migrations + Disable AutoMigrate**
+Remove AutoMigrate from main.go and manage all migrations as SQL files.
+Pros: Explicit schema control, migration history, easier to review
+Cons: Must manually sync Go models with SQL, more maintenance
+
+**Option C: Keep Current Setup (if schemas match exactly)**
+Only viable if `001_initial_schema.sql` produces identical schema to GORM AutoMigrate.
+Requires verification and careful maintenance to keep them in sync.
+
+---
+
+### Issue 4: Security Configuration Issues
+
+**Status:** ⚠️ INSECURE DEFAULTS (development-only)
+**Impact:** Severe security risk if deployed to production
+
+**Issues Identified:**
+
+1. **Weak JWT Secret (Line 55):**
+   ```yaml
+   JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+   ```
+   - Default value is a placeholder string, not a secure secret
+   - If user doesn't set environment variable, this insecure default is used
+   - JWT tokens can be forged if this secret is known
+   - Should use a strong random 32+ character secret
+
+2. **Weak Database Credentials (Lines 46-47):**
+   ```yaml
+   DB_USER: ${DB_USER:-root}
+   DB_PASSWORD: ${DB_PASSWORD:-root}
+   ```
+   - Both default to 'root'/'root' (well-known credentials)
+   - Root access exposed to application (violates least privilege principle)
+   - No separate user for application vs. database administration
+
+3. **Debug Mode Enabled (Line 52):**
+   ```yaml
+   GIN_MODE: ${GIN_MODE:-debug}
+   ```
+   - Defaults to debug mode, which exposes detailed error messages
+   - Should be 'release' in production for performance and security
+   - Debug mode logs sensitive information
+
+4. **Exposed Database Port (Line 17):**
+   ```yaml
+   ports:
+     - "${DB_PORT:-3306}:3306"
+   ```
+   - MySQL port exposed to host network
+   - Not necessary if only API needs database access (both on same network)
+   - Increases attack surface
+
+5. **API URL for Email Links (Line 68):**
+   ```yaml
+   API_URL: ${API_URL:-http://localhost:3000}
+   ```
+   - Used in email links (password reset, confirmation, etc.)
+   - Defaults to localhost, which won't work for email recipients
+   - Should be set to actual production domain
+
+**Recommendations:**
+
+**For Development (Current State):**
+- Add prominent warning in README about insecure defaults
+- Document that .env must be configured before deployment
+- Consider adding a startup warning if JWT_SECRET_KEY == default value
+
+**For Production:**
+```yaml
+# Required .env settings for production:
+JWT_SECRET_KEY=<generated-with-openssl-rand-base64-32>
+DB_USER=statuspage_app  # Non-root user
+DB_PASSWORD=<strong-random-password>
+GIN_MODE=release
+API_URL=https://status.yourdomain.com
+NEXT_PUBLIC_API_URL=http://api:8080/api/v1
+
+# Remove database port exposure:
+# ports:
+#   - "${DB_PORT:-3306}:3306"
+```
+
+**Security Hardening Steps:**
+1. Create separate MySQL user for application (not root)
+2. Generate strong JWT secret (32+ bytes random)
+3. Set GIN_MODE=release for production
+4. Remove database port exposure if not needed
+5. Configure API_URL to actual production domain
+6. Use HTTPS for all external URLs
+7. Consider adding rate limiting middleware
+8. Add database connection encryption (TLS)
+
+---
+
+### Issue 5: Resource and Scaling Considerations
+
+**Status:** ⚠️ NOT PRODUCTION-READY (missing resource limits)
+**Impact:** Containers can consume unlimited host resources
+
+**Missing Configurations:**
+
+1. **No Resource Limits:**
+   - No CPU limits (`cpus: '0.50'` or `cpu_shares`)
+   - No memory limits (`mem_limit: 512m` or `memory: '512m'`)
+   - Containers can consume all host resources
+   - Risk of one service starving others
+
+2. **No Restart Policies for Failures:**
+   - All services use `restart: unless-stopped`
+   - This restarts on crash but not on health check failure
+   - Consider `restart: on-failure` with max retries
+
+3. **No Logging Configuration:**
+   - No log rotation or size limits
+   - Logs can fill disk space over time
+   - Consider adding logging driver configuration
+
+**Recommended Production Configuration:**
+```yaml
+# Example for API service:
+api:
+  # ... existing config ...
+  deploy:
+    resources:
+      limits:
+        cpus: '1.0'
+        memory: 512M
+      reservations:
+        cpus: '0.25'
+        memory: 128M
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+```
+
+---
+
+### Issue 6: Container Port vs Service Port Configuration
+
+**Status:** ⚠️ POTENTIAL CONFUSION (mismatched port environment variables)
+**Impact:** Port configuration may not work as expected in all scenarios
+
+**Issue:**
+- **Frontend service (lines 96-97):**
+  ```yaml
+  ports:
+    - "${FRONTEND_PORT:-3000}:3000"
+  ```
+  - Environment variable `FRONTEND_PORT` controls **host port** (left side)
+  - Container always listens on **port 3000** (right side, hardcoded)
+  - If user sets `FRONTEND_PORT=3001`, host port changes but container still uses 3000
+
+- **Admin service (lines 123-124):**
+  ```yaml
+  ports:
+    - "${ADMIN_PORT:-3001}:3001"
+  ```
+  - Same pattern: `ADMIN_PORT` controls host port, not container port
+  - Admin container hardcoded to port 3001
+
+**Why This Matters:**
+- The Next.js applications must be configured to listen on the container port (right side)
+- If this doesn't match the Dockerfile CMD or next.config.js, the service won't respond
+- Health checks target the container port (e.g., `http://localhost:3001` on line 128)
+
+**Verification Needed:**
+Check that Dockerfile CMD and next.config.js specify correct ports:
+- Frontend: Must listen on port 3000 (container port)
+- Admin: Must listen on port 3001 (container port)
+
+**Current Configuration Assessment:**
+This is likely **correct** if:
+- `frontend/Dockerfile` CMD uses `PORT=3000` or hardcodes 3000
+- `admin/Dockerfile` CMD uses `PORT=3001` or hardcodes 3001
+- Both Dockerfiles have been verified (not shown in this analysis)
+
+**Recommendation:**
+Document in README that `FRONTEND_PORT` and `ADMIN_PORT` only control **host-side port mapping**, not the port the application listens on inside the container.
+
+---
+
+### Summary of docker-compose.yml Issues
+
+| Issue | Severity | Impact | Status |
+|-------|----------|--------|--------|
+| API URL (localhost vs service name) | 🔴 Critical | Frontend/Admin cannot reach API | Must Fix |
+| Health Check Endpoint | 🟢 OK | Dependency chain works correctly | Verified |
+| Dual Migration System | 🟡 Warning | Potential schema conflicts | Review |
+| Insecure Defaults | 🔴 Critical | Security vulnerabilities in production | Must Fix |
+| No Resource Limits | 🟡 Warning | Resource exhaustion possible | Production Concern |
+| Port Configuration | 🟡 Warning | Potential confusion | Document |
+
+**Priority Fix Order:**
+1. **Critical:** Update `NEXT_PUBLIC_API_URL` default to `http://api:8080/api/v1`
+2. **Critical:** Document security requirements and force .env configuration for production
+3. **Important:** Choose and document migration strategy (SQL vs GORM)
+4. **Important:** Add resource limits for production deployments
+5. **Nice-to-have:** Add comprehensive README with port mapping explanation
+
+---
+
 ## Next Steps
 
 To fix these issues, the following actions are required:
