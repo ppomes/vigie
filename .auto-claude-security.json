@@ -127,15 +127,48 @@
     "zip",
     "zsh"
   ],
-  "stack_commands": [],
+  "stack_commands": [
+    "dive",
+    "docker",
+    "docker-buildx",
+    "docker-compose",
+    "dockerfile",
+    "go",
+    "go-outline",
+    "gocode",
+    "gofmt",
+    "golint",
+    "gopls",
+    "gotests",
+    "mysql",
+    "mysqladmin",
+    "mysqlcheck",
+    "mysqldump",
+    "mysqlimport",
+    "mysqlshow",
+    "node",
+    "npm",
+    "npx",
+    "ts-node",
+    "tsc",
+    "tsx"
+  ],
   "script_commands": [],
   "custom_commands": [],
   "detected_stack": {
-    "languages": [],
+    "languages": [
+      "javascript",
+      "typescript",
+      "go"
+    ],
     "package_managers": [],
     "frameworks": [],
-    "databases": [],
-    "infrastructure": [],
+    "databases": [
+      "mysql"
+    ],
+    "infrastructure": [
+      "docker"
+    ],
     "cloud_providers": [],
     "code_quality_tools": [],
     "version_managers": []
@@ -147,7 +180,7 @@
     "cargo_aliases": [],
     "shell_scripts": []
   },
-  "project_dir": "/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/001-i-would-like-to-create-a-software-like-cachethq-bu",
-  "created_at": "2026-01-12T17:54:56.767956",
-  "project_hash": "e00a3ed301d11572a809cc67a8ec2218"
+  "project_dir": "/Users/ppomes/src/openstatus/openstatus/.auto-claude/worktrees/tasks/002-docker-compose-has-build-errors-please-validate-al",
+  "created_at": "2026-01-12T22:11:48.867684",
+  "project_hash": "1bf3f4b9187b059130aeb0d21b2b23c6"
 }

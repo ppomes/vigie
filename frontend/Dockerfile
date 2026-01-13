@@ -12,7 +12,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install dependencies using npm ci for reproducible builds
-RUN npm ci
+# Use --legacy-peer-deps due to React 19 and @testing-library/react@14 peer dependency conflict
+RUN npm ci --legacy-peer-deps
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
@@ -27,6 +28,9 @@ COPY . .
 
 # Set environment variable for API URL (can be overridden at runtime)
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create public directory if it doesn't exist (needed for COPY in runner stage)
+RUN mkdir -p public
 
 # Build the Next.js application
 # This will create .next/standalone directory due to output: 'standalone' in next.config.js
