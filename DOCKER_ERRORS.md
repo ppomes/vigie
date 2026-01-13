@@ -127,10 +127,95 @@ RUN npm ci
 
 **Exit Code:** 1
 
-**Root Cause:** The `frontend/package-lock.json` file does not exist. The Dockerfile uses `npm ci` (clean install) which requires a lockfile for reproducible builds. The `COPY package.json package-lock.json* ./` command copies package.json but the optional wildcard for package-lock.json* finds nothing.
+**Root Cause Analysis:**
+
+The Frontend service build fails due to a **missing package-lock.json file** in the repository. This is a fundamental npm build configuration issue:
+
+1. **Missing package-lock.json File (Primary Issue)**
+   - The `frontend/package-lock.json` file does not exist in the repository
+   - Confirmed via repository inspection - only package.json is present
+   - package-lock.json contains exact dependency versions and integrity hashes for all packages
+   - npm's `ci` command is designed for automated environments and requires this lockfile for reproducibility
+
+2. **Dockerfile Build Strategy (Context)**
+   - The Dockerfile uses `npm ci` (clean install) instead of `npm install` for production builds
+   - This is a deliberate best practice choice for several reasons:
+     - **Speed**: `npm ci` is significantly faster than `npm install` (skips dependency resolution)
+     - **Reproducibility**: Installs exact versions from lockfile, not semver ranges from package.json
+     - **Security**: Validates package integrity using checksums in lockfile
+     - **Consistency**: Ensures identical node_modules across all environments (dev, CI, production)
+   - The Dockerfile line `COPY package.json package-lock.json* ./` uses an optional wildcard `*`
+   - This allows the build to proceed if package-lock.json is missing, but `npm ci` will fail
+
+3. **Why package-lock.json is Critical**
+   - **Dependency Resolution**: package.json uses semver ranges (e.g., `^15.1.0`, `^19.0.0`)
+   - Without a lockfile, different installs could get different versions (^15.1.0 could resolve to 15.1.0 OR 15.2.0)
+   - The lockfile "locks" exact versions, including all transitive dependencies
+   - For Next.js projects with 200+ dependencies, this prevents version drift and "works on my machine" issues
+
+4. **Multi-Stage Build Impact**
+   - The frontend Dockerfile uses a multi-stage build pattern:
+     - Stage 1 (`deps`): Install dependencies using npm ci
+     - Stage 2 (`builder`): Copy deps and build the Next.js app
+     - Stage 3 (`runner`): Copy build artifacts to minimal production image
+   - The failure occurs in the **first stage** (`deps`), preventing any subsequent stages from executing
+   - This is a build-time error, not a runtime error
+
+**Dependencies Affected (from package.json):**
+- Production:
+  - `next: ^15.1.0` - Next.js framework
+  - `next-intl: ^3.25.2` - Internationalization library
+  - `react: ^19.0.0` - React library
+  - `react-dom: ^19.0.0` - React DOM renderer
+- Development (17 packages):
+  - TypeScript, Testing libraries, Tailwind CSS, Vitest, and more
 
 **Dockerfile Location:** `frontend/Dockerfile`
-**Dockerfile Line:** `RUN npm ci` in the `deps` stage
+**Affected Build Stage:** Line 15 - `RUN npm ci` in the `deps` stage
+
+**Proposed Fix Options:**
+
+**Option A: Generate and Commit package-lock.json (Recommended)**
+   ```bash
+   cd frontend
+   npm install  # Generates package-lock.json with all resolved dependencies
+   git add package-lock.json
+   git commit -m "Add package-lock.json for frontend service"
+   ```
+   **Benefits:**
+   - Ensures reproducible builds across all environments
+   - Enables faster `npm ci` installs in Docker and CI/CD
+   - Locks dependency versions, preventing unexpected updates
+   - Follows npm and Docker best practices
+   - No Dockerfile changes needed
+   - Expected lockfileVersion: 3 (npm 7+)
+
+**Option B: Modify Dockerfile to Use npm install**
+   ```dockerfile
+   # Change in deps stage:
+   RUN npm install --production=false
+   # Or for production only:
+   RUN npm install --production
+   ```
+   **Drawbacks:**
+   - Slower builds (re-resolves dependencies every time)
+   - Non-reproducible (different builds may get different versions)
+   - Defeats the purpose of using `npm ci` in Docker
+   - Not recommended for production environments
+
+**Option C: Generate lockfile in Dockerfile**
+   ```dockerfile
+   # After copying package.json:
+   RUN npm install --package-lock-only
+   RUN npm ci
+   ```
+   **Drawbacks:**
+   - Lockfile not committed to repository (still non-reproducible)
+   - Each build generates potentially different lockfile
+   - Adds extra build step and time
+   - Not recommended for production
+
+**Recommendation:** Option A is strongly recommended. The lockfile should be generated locally and committed to version control to ensure all team members and CI/CD environments use identical dependency versions.
 
 ---
 
