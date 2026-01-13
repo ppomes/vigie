@@ -7,6 +7,9 @@ const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
 
+  // Enable standalone output for Docker deployment
+  output: 'standalone',
+
   // Configure supported locales
   experimental: {
     // Enable experimental features if needed
