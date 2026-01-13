@@ -1,0 +1,342 @@
+mysql uses an image, skipping
+Building api
+#1 [internal] load build definition from Dockerfile
+#1 sha256:c483c5c94d2b4c198aab3f11aa209bd3909e02f966b545e62c4c71dc240347fc
+#1 transferring dockerfile: 1.56kB done
+#1 DONE 0.0s
+
+#2 [internal] load .dockerignore
+#2 sha256:82d671daf3208e20bc470636de2351b02a628d3b269dbc38b864fb89bba07a73
+#2 transferring context: 2B done
+#2 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/golang:1.23-alpine
+#4 sha256:b69e48f80a7d79aecc3281c2c7d87968fd54925df10516b747ca512e22e5aecb
+#4 ...
+
+#5 [auth] library/alpine:pull token for registry-1.docker.io
+#5 sha256:9b04212d07125f12cbc710629843257bda220f43ad9c7b86f986b938ecc6fdbc
+#5 DONE 0.0s
+
+#6 [auth] library/golang:pull token for registry-1.docker.io
+#6 sha256:2b7106739073e421bf0ee4997583cf4b374524d2233eeaf4114501833ea708b5
+#6 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/alpine:latest
+#3 sha256:d4fb25f5b5c00defc20ce26f2efc4e288de8834ed5aa59dff877b495ba88fda6
+#3 DONE 1.0s
+
+#4 [internal] load metadata for docker.io/library/golang:1.23-alpine
+#4 sha256:b69e48f80a7d79aecc3281c2c7d87968fd54925df10516b747ca512e22e5aecb
+#4 DONE 1.0s
+
+#11 [builder 1/8] FROM docker.io/library/golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f
+#11 sha256:8e512ca5ae918f6bb75af02f422f397a6382238ea11c984466c749248fd4b20f
+#11 CACHED
+
+#7 [stage-1 1/8] FROM docker.io/library/alpine:latest@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
+#7 sha256:d2386441d3af54f40f3ba00f97ea76125fd678d241d6c15c018c116d78109ee0
+#7 CACHED
+
+#14 [internal] load build context
+#14 sha256:831b89da5d743b0e00790480b1e87d5dc45ade95f386977fa4273d1d1f66a91f
+#14 transferring context: 108.49kB 0.0s done
+#14 DONE 0.0s
+
+#12 [builder 2/8] RUN apk add --no-cache git
+#12 sha256:4ca7dbe7794c224a35431dd9d76d634c006bd89b0c122472825760be3f409f6d
+#12 0.334 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/APKINDEX.tar.gz
+#12 0.632 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/APKINDEX.tar.gz
+#12 ...
+
+#8 [stage-1 2/8] RUN apk --no-cache add ca-certificates
+#8 sha256:2a41a6dd05c8c6fdfcac6ab745b527bcaf4c53ccdd5aa2d13fef4ba6ace3428f
+#8 1.162 (1/1) Installing ca-certificates (20251003-r0)
+#8 1.205 Executing busybox-1.37.0-r30.trigger
+#8 1.214 Executing ca-certificates-20251003-r0.trigger
+#8 1.277 OK: 8473 KiB in 17 packages
+#8 DONE 1.4s
+
+#12 [builder 2/8] RUN apk add --no-cache git
+#12 sha256:4ca7dbe7794c224a35431dd9d76d634c006bd89b0c122472825760be3f409f6d
+#12 1.368 (1/12) Installing brotli-libs (1.1.0-r2)
+#12 1.436 (2/12) Installing c-ares (1.34.6-r0)
+#12 1.466 (3/12) Installing libunistring (1.3-r0)
+#12 1.567 (4/12) Installing libidn2 (2.3.7-r0)
+#12 1.604 (5/12) Installing nghttp2-libs (1.65.0-r0)
+#12 1.627 (6/12) Installing libpsl (0.21.5-r3)
+#12 1.651 (7/12) Installing zstd-libs (1.5.7-r0)
+#12 ...
+
+#9 [stage-1 3/8] RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+#9 sha256:6526da739f408b01e2a82258394d84da8b86d7684aafb15f4ac569ab6f4abae6
+#9 DONE 0.4s
+
+#12 [builder 2/8] RUN apk add --no-cache git
+#12 sha256:4ca7dbe7794c224a35431dd9d76d634c006bd89b0c122472825760be3f409f6d
+#12 1.707 (8/12) Installing libcurl (8.14.1-r2)
+#12 1.751 (9/12) Installing libexpat (2.7.3-r0)
+#12 1.775 (10/12) Installing pcre2 (10.46-r0)
+#12 ...
+
+#10 [stage-1 4/8] WORKDIR /app
+#10 sha256:488381a662ef605262bfb8cc68506f6a52f5e5b08ae8c5aaedafdb71c99644c5
+#10 DONE 0.0s
+
+#12 [builder 2/8] RUN apk add --no-cache git
+#12 sha256:4ca7dbe7794c224a35431dd9d76d634c006bd89b0c122472825760be3f409f6d
+#12 1.820 (11/12) Installing git (2.49.1-r0)
+#12 2.119 (12/12) Installing git-init-template (2.49.1-r0)
+#12 2.142 Executing busybox-1.37.0-r18.trigger
+#12 2.152 OK: 20 MiB in 29 packages
+#12 DONE 2.3s
+
+#13 [builder 3/8] WORKDIR /app
+#13 sha256:18e70e590003f0761244e36a204e51057913629f6159d124932cb0c6adc34b07
+#13 DONE 0.0s
+
+#15 [builder 4/8] COPY go.mod ./
+#15 sha256:7b075d6dcc5ba3b496307092cf7281b778e2af8ba9c401dc55f2bfd9e2f13566
+#15 DONE 0.1s
+
+#16 [builder 5/8] COPY go.sum* ./
+#16 sha256:474935a48ab1c0bfd1a06d4a00877efc19f57018de55726017ca4f41e31afee7
+#16 DONE 0.1s
+
+#17 [builder 6/8] RUN go mod download
+#17 sha256:f44e8c7b7a3494d048acb65f623e255b32e1161e7dda673fa4e18debbf4bcb15
+#17 DONE 2.1s
+
+#18 [builder 7/8] COPY . .
+#18 sha256:5b32ce579543cc3e2c61e5ca07ec5a05534be23573dc09e18af79b30479207cb
+#18 DONE 0.0s
+
+#19 [builder 8/8] RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api/main.go
+#19 sha256:28f8ce53e6e798744ccce873cd14b2f8d384261117fc1a9f1ed32780659f0195
+#19 0.454 internal/database/database.go:7:2: missing go.sum entry for module providing package gorm.io/driver/mysql (imported by api/internal/database); to add:
+#19 0.454 	go get api/internal/database
+#19 0.454 internal/database/database.go:8:2: missing go.sum entry for module providing package gorm.io/gorm (imported by api/internal/database); to add:
+#19 0.454 	go get api/internal/database
+#19 0.454 internal/models/user.go:6:2: missing go.sum entry for module providing package golang.org/x/crypto/bcrypt (imported by api/internal/models); to add:
+#19 0.454 	go get api/internal/models
+#19 0.454 internal/handlers/admin.go:11:2: missing go.sum entry for module providing package github.com/gin-gonic/gin; to add:
+#19 0.454 	go mod download github.com/gin-gonic/gin
+#19 0.454 internal/handlers/auth.go:11:2: missing go.sum entry for module providing package github.com/golang-jwt/jwt/v5 (imported by api/internal/handlers); to add:
+#19 0.454 	go get api/internal/handlers
+#19 0.454 cmd/api/main.go:14:2: missing go.sum entry for module providing package github.com/joho/godotenv; to add:
+#19 0.454 	go mod download github.com/joho/godotenv
+#19 ERROR: executor failed running [/bin/sh -c CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api/main.go]: exit code: 1
+------
+ > [builder 8/8] RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api/main.go:
+------
+executor failed running [/bin/sh -c CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api/main.go]: exit code: 1
+Service 'api' failed to build : Build failed
+Building frontend
+#1 [internal] load build definition from Dockerfile
+#1 sha256:371eb0765d37f8afbe78f3eb0e5da60b391fc543159a78887f23ef323e21046d
+#1 transferring dockerfile: 2.00kB done
+#1 DONE 0.0s
+
+#2 [internal] load .dockerignore
+#2 sha256:cbefdcfd46efcae73ec0f8bd63e2ec00932fcdc1d8f5b291f9457732385c5098
+#2 transferring context: 2B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:20-alpine
+#3 sha256:6a38b13eea10abc9faf174f8cded2d4a94d7b9e78f4439b911fd30e8d8f0fc7b
+#3 ...
+
+#4 [auth] library/node:pull token for registry-1.docker.io
+#4 sha256:e1299496a100fff61bb1bdd78694062728ded7aa6e20e7a67a3499b0af2e6863
+#4 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:20-alpine
+#3 sha256:6a38b13eea10abc9faf174f8cded2d4a94d7b9e78f4439b911fd30e8d8f0fc7b
+#3 DONE 1.3s
+
+#11 [internal] load build context
+#11 sha256:f70b488e66f1ea0827b49d3e83003e43061231d54b68e1bef4a162aca2fc3714
+#11 transferring context: 36.73kB 0.0s done
+#11 DONE 0.0s
+
+#5 [deps 1/5] FROM docker.io/library/node:20-alpine@sha256:658d0f63e501824d6c23e06d4bb95c71e7d704537c9d9272f488ac03a370d448
+#5 sha256:a789b06aba0147c3786a6df6c8566253a892cb59251708d095cc818c5587602b
+#5 resolve docker.io/library/node:20-alpine@sha256:658d0f63e501824d6c23e06d4bb95c71e7d704537c9d9272f488ac03a370d448 0.0s done
+#5 sha256:fcbb8f7d018707c656a4da2eea8a15f2893d2258093fea9ff2ea5ea1cba82112 1.72kB / 1.72kB done
+#5 sha256:e80b0510ba947015cacddea3d23dcdc761e399971c074a1bf32eea7e44510524 6.52kB / 6.52kB done
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 0B / 42.78MB 0.1s
+#5 sha256:cb3325e64457574e24f92246e3da3376946e473d636209e1390eac47b50b26a3 0B / 1.26MB 0.1s
+#5 sha256:fd1849a5c548bc65ee47a64498951bda5d40e87d08efe9dca69b5c8cdedc7a52 0B / 443B 0.1s
+#5 sha256:658d0f63e501824d6c23e06d4bb95c71e7d704537c9d9272f488ac03a370d448 7.67kB / 7.67kB done
+#5 sha256:fd1849a5c548bc65ee47a64498951bda5d40e87d08efe9dca69b5c8cdedc7a52 443B / 443B 0.3s done
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 4.19MB / 42.78MB 0.6s
+#5 sha256:cb3325e64457574e24f92246e3da3376946e473d636209e1390eac47b50b26a3 1.05MB / 1.26MB 0.6s
+#5 sha256:cb3325e64457574e24f92246e3da3376946e473d636209e1390eac47b50b26a3 1.26MB / 1.26MB 0.6s done
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 9.44MB / 42.78MB 1.0s
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 13.63MB / 42.78MB 1.2s
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 17.83MB / 42.78MB 1.4s
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 22.02MB / 42.78MB 1.6s
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 27.26MB / 42.78MB 1.9s
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 31.46MB / 42.78MB 2.1s
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 36.70MB / 42.78MB 2.3s
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 40.89MB / 42.78MB 2.5s
+#5 sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 42.78MB / 42.78MB 2.6s done
+#5 extracting sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697
+#5 extracting sha256:8d06ba6946d1f299d8f962e37906c77006df33d47050430a57f7893ec35af697 2.2s done
+#5 extracting sha256:cb3325e64457574e24f92246e3da3376946e473d636209e1390eac47b50b26a3
+#5 extracting sha256:cb3325e64457574e24f92246e3da3376946e473d636209e1390eac47b50b26a3 0.1s done
+#5 extracting sha256:fd1849a5c548bc65ee47a64498951bda5d40e87d08efe9dca69b5c8cdedc7a52 done
+#5 DONE 5.4s
+
+#6 [builder 2/5] WORKDIR /app
+#6 sha256:cf0024855645affa9c804a8bdaa14762d4a7a8ad5a9e2a839c78329715fbfb70
+#6 DONE 0.3s
+
+#7 [runner 3/8] RUN apk --no-cache add ca-certificates
+#7 sha256:aca11c8ecbbf336bd80ff6b10f7e592b49b08d4836fa2f0498efbc10e7f7f42e
+#7 ...
+
+#9 [deps 2/5] RUN apk add --no-cache libc6-compat
+#9 sha256:04d41412e569691e3936e1640ba6823c7102da1a59e2782a6de82f23bb32d58d
+#9 1.408 (1/3) Installing musl-obstack (1.2.3-r2)
+#9 1.429 (2/3) Installing libucontext (1.3.3-r0)
+#9 1.447 (3/3) Installing gcompat (1.1.0-r4)
+#9 1.476 OK: 11.0 MiB in 21 packages
+#9 DONE 1.6s
+
+#10 [deps 3/5] WORKDIR /app
+#10 sha256:c2859cc6871bc546ea6a40b4fba362e1c80df7dc013a5faaa325cc2899121210
+#10 DONE 0.0s
+
+#12 [deps 4/5] COPY package.json package-lock.json* ./
+#12 sha256:271c01d7936d424956b63749b2b496ea1242e83f1bb2a38635ce4a3aa2eeace9
+#12 DONE 0.0s
+
+#7 [runner 3/8] RUN apk --no-cache add ca-certificates
+#7 sha256:aca11c8ecbbf336bd80ff6b10f7e592b49b08d4836fa2f0498efbc10e7f7f42e
+#7 1.284 (1/1) Installing ca-certificates (20251003-r0)
+#7 1.340 Executing busybox-1.37.0-r30.trigger
+#7 1.347 Executing ca-certificates-20251003-r0.trigger
+#7 1.403 OK: 11.1 MiB in 19 packages
+#7 DONE 1.5s
+
+#13 [deps 5/5] RUN npm ci
+#13 sha256:284839deca83639b9c287da4a914996a9a4548b40ec4a82fbcc6cd403f78912a
+#13 ...
+
+#8 [runner 4/8] RUN addgroup -S nodegroup && adduser -S nodeuser -G nodegroup
+#8 sha256:702acf9e2c3dfb8d6a1cb0cd2b091203bb9a6c1d03c2fbe135c122774719cc3c
+#8 DONE 0.5s
+
+#13 [deps 5/5] RUN npm ci
+#13 sha256:284839deca83639b9c287da4a914996a9a4548b40ec4a82fbcc6cd403f78912a
+#13 1.210 npm error code EUSAGE
+#13 1.211 npm error
+#13 1.211 npm error The `npm ci` command can only install with an existing package-lock.json or
+#13 1.211 npm error npm-shrinkwrap.json with lockfileVersion >= 1. Run an install with npm@5 or
+#13 1.211 npm error later to generate a package-lock.json file, then try again.
+#13 1.211 npm error
+#13 1.211 npm error Clean install a project
+#13 1.211 npm error
+#13 1.211 npm error Usage:
+#13 1.211 npm error npm ci
+#13 1.211 npm error
+#13 1.211 npm error Options:
+#13 1.211 npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+#13 1.211 npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+#13 1.211 npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+#13 1.211 npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+#13 1.211 npm error [--no-bin-links] [--no-fund] [--dry-run]
+#13 1.211 npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+#13 1.211 npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+#13 1.211 npm error
+#13 1.211 npm error aliases: clean-install, ic, install-clean, isntall-clean
+#13 1.211 npm error
+#13 1.211 npm error Run "npm help ci" for more info
+#13 1.217 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-01-13T03_12_35_629Z-debug-0.log
+#13 ERROR: executor failed running [/bin/sh -c npm ci]: exit code: 1
+------
+ > [deps 5/5] RUN npm ci:
+------
+executor failed running [/bin/sh -c npm ci]: exit code: 1
+Service 'frontend' failed to build : Build failed
+Building admin
+#1 [internal] load build definition from Dockerfile
+#1 sha256:100adeec3ac4300b9823e0fa00fdfee819e0b0a4d4a4588d02621b368c639bca
+#1 transferring dockerfile: 2.02kB done
+#1 DONE 0.0s
+
+#2 [internal] load .dockerignore
+#2 sha256:6a56902871dc6d6845ce97591cee969a266097327c4cc3be28e1edc05c450ce0
+#2 transferring context: 2B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:20-alpine
+#3 sha256:6a38b13eea10abc9faf174f8cded2d4a94d7b9e78f4439b911fd30e8d8f0fc7b
+#3 DONE 0.2s
+
+#4 [deps 1/5] FROM docker.io/library/node:20-alpine@sha256:658d0f63e501824d6c23e06d4bb95c71e7d704537c9d9272f488ac03a370d448
+#4 sha256:a789b06aba0147c3786a6df6c8566253a892cb59251708d095cc818c5587602b
+#4 DONE 0.0s
+
+#6 [runner 3/8] RUN apk --no-cache add ca-certificates
+#6 sha256:aca11c8ecbbf336bd80ff6b10f7e592b49b08d4836fa2f0498efbc10e7f7f42e
+#6 CACHED
+
+#5 [builder 2/5] WORKDIR /app
+#5 sha256:cf0024855645affa9c804a8bdaa14762d4a7a8ad5a9e2a839c78329715fbfb70
+#5 CACHED
+
+#7 [runner 4/8] RUN addgroup -S nodegroup && adduser -S nodeuser -G nodegroup
+#7 sha256:702acf9e2c3dfb8d6a1cb0cd2b091203bb9a6c1d03c2fbe135c122774719cc3c
+#7 CACHED
+
+#10 [internal] load build context
+#10 sha256:d46032dda5b288ed078ed3ff003559dc6bba7034ac4d8896704fceb6664c85c3
+#10 transferring context: 110.66kB 0.0s done
+#10 DONE 0.0s
+
+#8 [deps 2/5] RUN apk add --no-cache libc6-compat
+#8 sha256:04d41412e569691e3936e1640ba6823c7102da1a59e2782a6de82f23bb32d58d
+#8 CACHED
+
+#9 [deps 3/5] WORKDIR /app
+#9 sha256:c2859cc6871bc546ea6a40b4fba362e1c80df7dc013a5faaa325cc2899121210
+#9 CACHED
+
+#11 [deps 4/5] COPY package.json package-lock.json* ./
+#11 sha256:86a7a6015fbbe1dcbcfa700370f4296672394080ac8c3efc32d615713a26da21
+#11 DONE 0.0s
+
+#12 [deps 5/5] RUN npm ci
+#12 sha256:3ec22b41dbf2ee9bdc8d4cfa7a6bd418af8fb6ecb0ef44a63630dd251af8e4ad
+#12 1.108 npm error code EUSAGE
+#12 1.109 npm error
+#12 1.109 npm error The `npm ci` command can only install with an existing package-lock.json or
+#12 1.109 npm error npm-shrinkwrap.json with lockfileVersion >= 1. Run an install with npm@5 or
+#12 1.109 npm error later to generate a package-lock.json file, then try again.
+#12 1.109 npm error
+#12 1.109 npm error Clean install a project
+#12 1.109 npm error
+#12 1.109 npm error Usage:
+#12 1.109 npm error npm ci
+#12 1.109 npm error
+#12 1.109 npm error Options:
+#12 1.109 npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+#12 1.109 npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+#12 1.109 npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+#12 1.109 npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+#12 1.109 npm error [--no-bin-links] [--no-fund] [--dry-run]
+#12 1.109 npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+#12 1.109 npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+#12 1.109 npm error
+#12 1.109 npm error aliases: clean-install, ic, install-clean, isntall-clean
+#12 1.109 npm error
+#12 1.109 npm error Run "npm help ci" for more info
+#12 1.115 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-01-13T03_12_42_633Z-debug-0.log
+#12 ERROR: executor failed running [/bin/sh -c npm ci]: exit code: 1
+------
+ > [deps 5/5] RUN npm ci:
+------
+executor failed running [/bin/sh -c npm ci]: exit code: 1
+Service 'admin' failed to build : Build failed
