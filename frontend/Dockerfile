@@ -50,6 +50,7 @@ RUN addgroup -S nodegroup && adduser -S nodeuser -G nodegroup
 # Set to production environment
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
 
 # Copy standalone output from builder
 # Next.js standalone output includes minimal files needed to run

@@ -13,7 +13,7 @@ type Component struct {
 	Name         string         `gorm:"size:255;not null" json:"name"`
 	Status       string         `gorm:"size:50;not null;default:'operational'" json:"status"` // operational, degraded_performance, partial_outage, major_outage
 	Order        int            `gorm:"default:0" json:"order"`                                // Display order on status page
-	Translations []Translation  `gorm:"foreignKey:EntityID;constraint:OnDelete:CASCADE" json:"translations,omitempty"`
+	Translations []Translation  `gorm:"-" json:"translations,omitempty"`
 	Incidents    []Incident     `gorm:"foreignKey:ComponentID" json:"incidents,omitempty"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`

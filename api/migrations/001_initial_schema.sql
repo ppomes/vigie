@@ -5,7 +5,7 @@
 
 -- Create users table for admin authentication
 CREATE TABLE IF NOT EXISTS users (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Create components table for status components (API, Website, Database, etc.)
 CREATE TABLE IF NOT EXISTS components (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'operational',
     description TEXT,
@@ -35,10 +35,10 @@ CREATE TABLE IF NOT EXISTS components (
 
 -- Create incidents table for tracking service incidents
 CREATE TABLE IF NOT EXISTS incidents (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'investigating',
-    component_id INT UNSIGNED,
+    component_id BIGINT UNSIGNED,
     message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS incidents (
 
 -- Create subscribers table for email subscription management
 CREATE TABLE IF NOT EXISTS subscribers (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     confirmed BOOLEAN DEFAULT FALSE,
     confirmation_token VARCHAR(255),
@@ -72,8 +72,8 @@ CREATE TABLE IF NOT EXISTS subscribers (
 -- This table stores translations for components, incidents, and other entities
 -- CASCADE deletion ensures translations are removed when parent entity is deleted
 CREATE TABLE IF NOT EXISTS translations (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    entity_id INT UNSIGNED NOT NULL,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    entity_id BIGINT UNSIGNED NOT NULL,
     entity VARCHAR(50) NOT NULL,
     locale VARCHAR(5) NOT NULL DEFAULT 'en',
     field VARCHAR(50) NOT NULL,
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS translations (
 
 -- Create schema_migrations table to track applied migrations
 CREATE TABLE IF NOT EXISTS schema_migrations (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     version VARCHAR(255) NOT NULL UNIQUE,
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_schema_migrations_version (version)
