@@ -1,0 +1,598 @@
+{
+  "feature": "Docker Compose Build Error Investigation and Fix",
+  "workflow_type": "investigation",
+  "workflow_rationale": "Build errors are unknown at planning time. Requires iterative diagnostic approach: discover errors \u2192 diagnose root causes \u2192 fix \u2192 validate. This follows investigation workflow rather than feature development.",
+  "phases": [
+    {
+      "id": "phase-1-reproduce",
+      "name": "Reproduce and Capture Errors",
+      "type": "investigation",
+      "description": "Run docker-compose build to discover all build errors across all services",
+      "depends_on": [],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Clean Docker environment and attempt full build",
+          "service": "all",
+          "files_to_modify": [],
+          "files_to_create": [
+            "DOCKER_ERRORS.md"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "test -f DOCKER_ERRORS.md && grep -q 'Build Errors:' DOCKER_ERRORS.md",
+            "expected": "File exists with error documentation"
+          },
+          "expected_output": "DOCKER_ERRORS.md documenting: (1) All build failures, (2) Error messages from each service, (3) Build order attempted",
+          "notes": "Successfully cleaned Docker environment and attempted full build. Captured all build errors in DOCKER_ERRORS.md. Identified three main issues: (1) API service missing go.sum entries for 6 dependencies, (2) Frontend service missing package-lock.json, (3) Admin service missing package-lock.json. All errors documented with root causes and next steps.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:13:30.442078+00:00"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Generate missing package-lock.json files for frontend and admin",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/package-lock.json",
+            "admin/package-lock.json"
+          ],
+          "patterns_from": [
+            "frontend/package.json",
+            "admin/package.json"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "test -f frontend/package-lock.json && test -f admin/package-lock.json",
+            "expected": "Both lockfiles exist"
+          },
+          "notes": "Successfully generated package-lock.json files for both frontend and admin services using 'npm install --legacy-peer-deps' due to peer dependency conflicts between React 19 and @testing-library/react@14. Both lockfiles committed and verified.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:16:08.956796+00:00"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Create .dockerignore files to optimize build context",
+          "service": "all",
+          "files_to_modify": [],
+          "files_to_create": [
+            "api/.dockerignore",
+            "frontend/.dockerignore",
+            "admin/.dockerignore"
+          ],
+          "patterns_from": [
+            ".gitignore"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "test -f api/.dockerignore && test -f frontend/.dockerignore && test -f admin/.dockerignore",
+            "expected": "All .dockerignore files exist"
+          },
+          "notes": "Successfully created .dockerignore files for all three services (api, frontend, admin). Files exclude: node_modules, .git, build artifacts (.next, dist, out), test files, IDE configs, OS files, logs, and .auto-claude. API .dockerignore excludes Go build artifacts (*.exe, *.so, *.test, *.out). Frontend and admin exclude Next.js build output and test configs. All files keep necessary config files (.env.example/.env.local.example) while excluding actual .env files for security. Committed with hash f426cbc.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:18:22.948301+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-investigate",
+      "name": "Analyze Root Causes",
+      "type": "investigation",
+      "description": "Analyze captured errors and document root causes for each failure",
+      "depends_on": [
+        "phase-1-reproduce"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Analyze API service build errors",
+          "service": "api",
+          "files_to_modify": [
+            "DOCKER_ERRORS.md"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "api/Dockerfile",
+            "api/go.mod"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review DOCKER_ERRORS.md for API section documenting root cause and proposed fix"
+          },
+          "expected_output": "Root cause analysis for API build failures including: Go dependency issues, missing files, incorrect paths, or build command problems",
+          "notes": "Comprehensive root cause analysis completed. Identified three-part issue: (1) Missing api/go.sum file (verified via ls -la api/), (2) Incomplete go.mod missing golang.org/x/crypto/bcrypt direct dependency used in api/internal/models/user.go:6, (3) Dockerfile build flow limitation where 'go mod download' doesn't create complete go.sum. Documented all missing dependencies with context and provided two fix options with recommendation to generate and commit go.sum using 'go mod tidy'.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:20:41.202866+00:00"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Analyze Frontend service build errors",
+          "service": "frontend",
+          "files_to_modify": [
+            "DOCKER_ERRORS.md"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/Dockerfile",
+            "frontend/package.json",
+            "frontend/next.config.js"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review DOCKER_ERRORS.md for Frontend section documenting root cause and proposed fix"
+          },
+          "expected_output": "Root cause analysis for Frontend build failures including: npm dependency issues, Next.js build errors, standalone output problems, or missing files",
+          "notes": "Enhanced DOCKER_ERRORS.md with comprehensive root cause analysis for Frontend service build failure. Documented the missing package-lock.json issue, explained why npm ci requires lockfile for reproducible builds, detailed the multi-stage build impact, and provided three fix options with Option A (generate and commit lockfile) as the recommended approach. Analysis follows the same detailed pattern as the API service section.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:22:56.269829+00:00"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Analyze Admin service build errors",
+          "service": "admin",
+          "files_to_modify": [
+            "DOCKER_ERRORS.md"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "admin/Dockerfile",
+            "admin/package.json",
+            "admin/next.config.js"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review DOCKER_ERRORS.md for Admin section documenting root cause and proposed fix"
+          },
+          "expected_output": "Root cause analysis for Admin build failures including: npm dependency issues, Next.js build errors, port configuration (3001 vs 3000), or missing files",
+          "notes": "Completed comprehensive root cause analysis for Admin service build errors. Documented missing package-lock.json issue with detailed analysis covering: (1) missing lockfile primary issue, (2) Dockerfile build strategy context, (3) critical nature of lockfile for Admin's next-intl dependencies, (4) multi-stage build impact, (5) Admin-specific configuration (port 3001, standalone output, i18n). Provided three fix options with detailed pros/cons and recommended Option A (generate and commit lockfile). Analysis follows same comprehensive pattern as Frontend service section.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:24:36.243071+00:00"
+        },
+        {
+          "id": "subtask-2-4",
+          "description": "Analyze docker-compose.yml configuration issues",
+          "service": "all",
+          "files_to_modify": [
+            "DOCKER_ERRORS.md"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "docker-compose.yml",
+            ".env.example"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review DOCKER_ERRORS.md for docker-compose section documenting configuration issues"
+          },
+          "expected_output": "Analysis of docker-compose.yml issues including: Environment variable problems, dependency ordering, health check configurations, or network settings",
+          "notes": "Completed comprehensive docker-compose.yml configuration analysis. Documented 6 critical issues in DOCKER_ERRORS.md: (1) Critical API URL misconfiguration - NEXT_PUBLIC_API_URL defaults to localhost:8080 instead of http://api:8080/api/v1 for Docker networking, causing frontend/admin to fail reaching API; (2) Verified API health check endpoint exists at /api/v1/status (confirmed in main.go:60); (3) Identified dual migration system warning - both SQL migrations (001_initial_schema.sql) and GORM AutoMigrate run simultaneously, potential conflicts; (4) Security issues - insecure defaults for JWT_SECRET_KEY, database credentials (root/root), debug mode enabled, exposed MySQL port 3306; (5) Missing resource limits - no CPU/memory constraints, no log rotation; (6) Port configuration clarification - FRONTEND_PORT/ADMIN_PORT only control host-side mapping, not container listen port. Created detailed summary table with severity levels and priority fix order. All issues documented with root cause analysis, proposed fixes, and recommendations.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:27:31.516772+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-fix",
+      "name": "Implement Fixes",
+      "type": "implementation",
+      "description": "Apply fixes for all identified issues across services",
+      "depends_on": [
+        "phase-2-investigate"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Fix API Dockerfile issues",
+          "service": "api",
+          "files_to_modify": [
+            "api/Dockerfile"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "api/go.mod"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "docker-compose build api",
+            "expected": "API image builds successfully (exit code 0)"
+          },
+          "notes": "Successfully fixed API Dockerfile issues. Reordered build steps to copy source before running go mod tidy, and resolved function name collision between auth.go and subscription.go. API service now builds successfully.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:31:59.650266+00:00"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Fix Frontend Dockerfile issues",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/Dockerfile"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/next.config.js"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "docker-compose build frontend",
+            "expected": "Frontend image builds successfully (exit code 0)"
+          },
+          "notes": "Successfully fixed Frontend Dockerfile issues. Applied three key fixes: (1) Added --legacy-peer-deps to npm ci command to handle React 19 and @testing-library/react@14 peer dependency conflict, (2) Updated app/[locale]/layout.tsx to handle async params - changed params type from { locale: string } to Promise<{ locale: string }> to comply with Next.js 15 breaking change, (3) Created public directory in builder stage using mkdir -p to ensure COPY command succeeds even when directory doesn't exist in source. Frontend image now builds successfully with exit code 0.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:37:26.239489+00:00"
+        },
+        {
+          "id": "subtask-3-3",
+          "description": "Fix Admin Dockerfile issues",
+          "service": "admin",
+          "files_to_modify": [
+            "admin/Dockerfile"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "admin/next.config.js"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "docker-compose build admin",
+            "expected": "Admin image builds successfully (exit code 0)"
+          },
+          "notes": "Successfully fixed Admin Dockerfile issues. Applied four key fixes: (1) Added --legacy-peer-deps to npm ci command to handle React 19 and @testing-library/react@14 peer dependency conflicts, (2) Updated admin/app/[locale]/layout.tsx to handle async params per Next.js 15 requirements - changed params type from { locale: string } to Promise<{ locale: string }> and added await for params destructuring, (3) Created public directory in builder stage using mkdir -p to prevent COPY errors, (4) Fixed TypeScript type error in incidents/new/page.tsx by updating handleSubmit to accept union type CreateIncidentRequest | UpdateIncidentRequest to match IncidentForm component's onSubmit signature. Admin image now builds successfully with exit code 0. Committed with hash 016f4f5.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:42:24.677894+00:00"
+        },
+        {
+          "id": "subtask-3-4",
+          "description": "Fix docker-compose.yml configuration",
+          "service": "all",
+          "files_to_modify": [
+            "docker-compose.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".env.example"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "docker-compose config",
+            "expected": "Configuration validates without errors"
+          },
+          "notes": "Successfully fixed docker-compose.yml configuration. Applied two critical fixes: (1) Updated NEXT_PUBLIC_API_URL default value from 'http://localhost:8080/api/v1' to 'http://api:8080/api/v1' for both frontend and admin services to enable proper Docker inter-service communication via service names, (2) Added PORT=3001 environment variable to admin service to ensure it listens on port 3001 instead of the Next.js default port 3000. Configuration validated successfully with 'docker-compose config' command showing no errors. Committed changes with hash 121c02a.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:43:56.523969+00:00"
+        },
+        {
+          "id": "subtask-3-5",
+          "description": "Create or update .env file with required variables",
+          "service": "all",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".env"
+          ],
+          "patterns_from": [
+            ".env.example"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "test -f .env && grep -q 'DB_HOST' .env && grep -q 'JWT_SECRET_KEY' .env",
+            "expected": ".env file exists with required variables"
+          },
+          "notes": "Created .env file based on .env.example with required variables (DB_HOST, JWT_SECRET_KEY, and all other configuration). Verification passed successfully.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:44:54.154130+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-validate",
+      "name": "Validation and Integration Testing",
+      "type": "integration",
+      "description": "Verify all services build, start, and communicate correctly as a complete stack",
+      "depends_on": [
+        "phase-3-fix"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Verify all images build successfully",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "docker-compose build --no-cache",
+            "expected": "All services build with exit code 0, no errors"
+          },
+          "notes": "Successfully verified all images build with clean cache. Executed 'docker-compose build --no-cache' with exit code 0. All four services built successfully: (1) mysql - uses official image, skipped build; (2) api - built successfully in 31s, final image 39.3MB; (3) frontend - built successfully in 65s, final image 211MB; (4) admin - built successfully in 67s, final image 211MB with minor warning about missing page_client-reference-manifest.js (non-blocking). All Docker images verified with 'docker images' command showing latest tags. No build errors encountered.",
+          "status": "completed",
+          "updated_at": "2026-01-13T03:50:45.089504+00:00"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Verify all services start and reach healthy state",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "docker-compose up -d && sleep 60 && docker-compose ps",
+            "expected": "All services show 'Up' status, mysql shows 'healthy'"
+          },
+          "notes": "Successfully verified all services start and reach healthy state. Fixed database schema type mismatches (INT UNSIGNED \u2192 BIGINT UNSIGNED), resolved polymorphic Translation model foreign key conflicts, configured Next.js to bind to 0.0.0.0, and updated health check endpoints. All four services (mysql, api, frontend, admin) now show 'Up (healthy)' status. Committed changes with hash fdb5312.",
+          "status": "completed",
+          "updated_at": "2026-01-13T04:11:07.745610+00:00"
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Verify database connectivity from API",
+          "service": "api",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "docker-compose logs api | grep -i 'database\\|mysql\\|connected'",
+            "expected": "API logs show successful database connection"
+          },
+          "notes": "Successfully verified database connectivity from API service. Evidence: (1) Network connectivity confirmed via nc -zv mysql 3306, (2) No connection errors in API logs, (3) API startup would fail-fast if DB connection failed (log.Fatalf in main.go), (4) /api/v1/status endpoint successfully queries database and returns components_count: 3 and active_incidents_count: 0, (5) Database 'statuspage' exists with all tables created (components, incidents, schema_migrations, subscribers, translations, users). API is healthy and processing requests. Note: Go code only logs connection failures, not successes, which is why grep returns no output.",
+          "status": "completed",
+          "updated_at": "2026-01-13T04:13:48.669823+00:00"
+        },
+        {
+          "id": "subtask-4-4",
+          "description": "Verify API health endpoint accessible from host",
+          "service": "api",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8080/api/v1/status",
+            "expected_status": 200
+          },
+          "notes": "Curl the API health endpoint from host machine. Should return 200 OK with JSON response.",
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-5",
+          "description": "Verify Frontend accessible and can reach API",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": [
+              "Page loads (200 status)",
+              "No 500 errors",
+              "No console errors in browser logs"
+            ]
+          },
+          "notes": "Access frontend in browser. Verify page loads. Check browser console for errors. Verify frontend can make API calls (check network tab).",
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-6",
+          "description": "Verify Admin accessible on port 3001",
+          "service": "admin",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3001",
+            "checks": [
+              "Page loads (200 status)",
+              "Runs on port 3001 (not 3000)",
+              "No 500 errors",
+              "No console errors"
+            ]
+          },
+          "notes": "Access admin in browser on port 3001. Verify it's different from frontend. Check for errors. Confirm it can reach API.",
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-7",
+          "description": "Verify inter-service communication via Docker network",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Verify API can connect to mysql service name",
+              "Verify frontend can reach api service name",
+              "Verify admin can reach api service name",
+              "Check docker-compose logs for network errors"
+            ]
+          },
+          "notes": "Use 'docker-compose exec' to test connectivity: 'docker-compose exec api nc -zv mysql 3306' and 'docker-compose exec frontend curl -I http://api:8080/health'",
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-8",
+          "description": "Verify clean restart and reproducibility",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "docker-compose down -v && docker-compose up -d && sleep 60 && docker-compose ps | grep -v 'Exit'",
+            "expected": "Stack restarts cleanly from scratch, all services up"
+          },
+          "notes": "Full teardown including volumes, then restart. Verifies setup is reproducible. All services should come back up healthy.",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 4,
+    "total_subtasks": 20,
+    "services_involved": [
+      "mysql",
+      "api",
+      "frontend",
+      "admin"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 1,
+      "parallel_groups": [],
+      "recommended_workers": 1,
+      "speedup_estimate": "Sequential execution required - investigation workflow with phase dependencies"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 002 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "test_creation_phase": "not_applicable",
+    "test_types_required": [
+      "integration"
+    ],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "All Docker images build without errors",
+      "All services start and remain running (no crash loops)",
+      "API connects to database successfully",
+      "API health endpoint returns 200 OK from host",
+      "Frontend loads at http://localhost:3000",
+      "Admin loads at http://localhost:3001",
+      "Inter-service communication works via Docker network",
+      "Full stack can restart cleanly from scratch"
+    ],
+    "verification_steps": [
+      {
+        "name": "Build Validation",
+        "command": "docker-compose build --no-cache",
+        "expected_outcome": "All services build successfully (exit code 0)",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Service Startup",
+        "command": "docker-compose up -d && sleep 60 && docker-compose ps",
+        "expected_outcome": "All 4 services running, mysql healthy",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "API Health Check",
+        "command": "curl -f http://localhost:8080/api/v1/status",
+        "expected_outcome": "HTTP 200 response",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Frontend Accessibility",
+        "command": "curl -I http://localhost:3000",
+        "expected_outcome": "HTTP 200 or 304 response",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Admin Accessibility",
+        "command": "curl -I http://localhost:3001",
+        "expected_outcome": "HTTP 200 or 304 response",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Database Connectivity",
+        "command": "docker-compose exec api nc -zv mysql 3306",
+        "expected_outcome": "Connection succeeds",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Log Validation",
+        "command": "docker-compose logs",
+        "expected_outcome": "No critical errors in any service logs",
+        "type": "integration",
+        "required": true,
+        "blocking": false
+      }
+    ],
+    "reasoning": "Investigation workflow requires integration testing to verify Docker stack functions correctly. No unit tests needed as this is infrastructure configuration, not application code."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": false,
+      "commands": [],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "docker-compose build --no-cache",
+        "docker-compose up -d",
+        "curl -f http://localhost:8080/api/v1/status",
+        "curl -I http://localhost:3000",
+        "curl -I http://localhost:3001",
+        "docker-compose exec api nc -zv mysql 3306"
+      ],
+      "services_to_test": [
+        "mysql",
+        "api",
+        "frontend",
+        "admin"
+      ]
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": []
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:3000",
+          "checks": [
+            "renders",
+            "no-console-errors",
+            "no-500-errors"
+          ]
+        },
+        {
+          "url": "http://localhost:3001",
+          "checks": [
+            "renders",
+            "no-console-errors",
+            "no-500-errors"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": true,
+      "checks": [
+        "mysql-container-healthy",
+        "api-connects-to-database",
+        "no-connection-errors-in-logs"
+      ]
+    }
+  },
+  "qa_signoff": null,
+  "status": "in_progress",
+  "planStatus": "in_progress",
+  "updated_at": "2026-01-13T04:11:24.161Z",
+  "last_updated": "2026-01-13T04:13:48.669838+00:00"
+}
