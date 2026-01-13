@@ -1,0 +1,83 @@
+# =============================================================================
+# Go API .dockerignore
+# =============================================================================
+# Optimizes Docker build context by excluding unnecessary files
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+*.env
+!.env.example
+
+# Build artifacts
+api
+api-test
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.o
+*.a
+
+# Go workspace
+go.work
+
+# Testing and coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+\#*\#
+.\#*
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Documentation and misc
+README.md
+*.md
+!migrations/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Auto Claude
+.auto-claude/
