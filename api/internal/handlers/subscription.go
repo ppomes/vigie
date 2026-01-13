@@ -52,8 +52,8 @@ func Subscribe(db *gorm.DB, emailService services.EmailService) gin.HandlerFunc 
 				existingSubscriber.Confirmed = false
 
 				// Generate new tokens
-				confirmToken, _ := generateToken(32)
-				unsubToken, _ := generateToken(32)
+				confirmToken, _ := generateRandomToken(32)
+				unsubToken, _ := generateRandomToken(32)
 				existingSubscriber.ConfirmationToken = confirmToken
 				existingSubscriber.UnsubscribeToken = unsubToken
 
@@ -108,13 +108,13 @@ func Subscribe(db *gorm.DB, emailService services.EmailService) gin.HandlerFunc 
 		}
 
 		// Create new subscriber
-		confirmationToken, err := generateToken(32)
+		confirmationToken, err := generateRandomToken(32)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate confirmation token"})
 			return
 		}
 
-		unsubscribeToken, err := generateToken(32)
+		unsubscribeToken, err := generateRandomToken(32)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate unsubscribe token"})
 			return
@@ -231,9 +231,9 @@ func Unsubscribe(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// generateToken generates a cryptographically secure random token
+// generateRandomToken generates a cryptographically secure random token
 // Used for confirmation and unsubscribe tokens
-func generateToken(length int) (string, error) {
+func generateRandomToken(length int) (string, error) {
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
