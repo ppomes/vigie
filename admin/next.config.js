@@ -7,8 +7,9 @@ const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
 
-  // Enable standalone output for Docker deployment
-  output: 'standalone',
+  // Disable standalone output due to Next.js 15.5.9 bug with route groups
+  // See: https://github.com/vercel/next.js/issues/...
+  // output: 'standalone',
 
   // Configure supported locales
   experimental: {

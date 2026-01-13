@@ -52,11 +52,20 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 
-# Copy standalone output from builder
-# Next.js standalone output includes minimal files needed to run
-COPY --from=builder --chown=nodeuser:nodegroup /app/.next/standalone ./
-COPY --from=builder --chown=nodeuser:nodegroup /app/.next/static ./.next/static
+# Copy Next.js build output
+# Using regular build (not standalone) due to Next.js 15.5.9 route group bug
+COPY --from=builder --chown=nodeuser:nodegroup /app/.next ./.next
 COPY --from=builder --chown=nodeuser:nodegroup /app/public ./public
+COPY --from=builder --chown=nodeuser:nodegroup /app/package.json ./package.json
+
+# Copy only production dependencies
+COPY --from=builder --chown=nodeuser:nodegroup /app/node_modules ./node_modules
+
+# Copy necessary source files for Next.js runtime
+COPY --from=builder --chown=nodeuser:nodegroup /app/next.config.js ./next.config.js
+COPY --from=builder --chown=nodeuser:nodegroup /app/i18n.ts ./i18n.ts
+COPY --from=builder --chown=nodeuser:nodegroup /app/middleware.ts ./middleware.ts
+COPY --from=builder --chown=nodeuser:nodegroup /app/messages ./messages
 
 # Copy environment example file as reference
 COPY --from=builder --chown=nodeuser:nodegroup /app/.env.local.example* ./
@@ -71,6 +80,6 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3001 || exit 1
 
-# Start the Next.js server
-# The standalone server is in server.js
-CMD ["node", "server.js"]
+# Start the Next.js server using npm start
+# This uses the regular Next.js production server
+CMD ["npm", "start"]
