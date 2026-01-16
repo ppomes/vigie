@@ -1,0 +1,56 @@
+{
+  "status": {
+    "title": "État du Système",
+    "description": "État opérationnel actuel de tous les services",
+    "allSystemsOperational": "Tous les systèmes sont opérationnels",
+    "systemsExperiencingIssues": "Certains systèmes rencontrent des problèmes"
+  },
+  "components": {
+    "title": "Composants",
+    "noComponents": "Aucun composant à afficher"
+  },
+  "componentStatus": {
+    "operational": "Opérationnel",
+    "degraded_performance": "Performance dégradée",
+    "partial_outage": "Panne partielle",
+    "major_outage": "Panne majeure",
+    "under_maintenance": "En maintenance"
+  },
+  "incidents": {
+    "title": "Incidents",
+    "noIncidents": "Aucun incident à afficher"
+  },
+  "incidentStatus": {
+    "investigating": "En cours d'investigation",
+    "identified": "Identifié",
+    "monitoring": "Surveillance",
+    "resolved": "Résolu"
+  },
+  "maintenances": {
+    "title": "Maintenances Planifiées",
+    "noMaintenances": "Aucune maintenance planifiée",
+    "component": "Composant"
+  },
+  "maintenanceStatus": {
+    "scheduled": "Planifiée",
+    "in_progress": "En cours",
+    "completed": "Terminée"
+  },
+  "subscription": {
+    "title": "S'abonner aux mises à jour",
+    "description": "Soyez notifié lors des mises à jour de statut",
+    "emailPlaceholder": "Entrez votre adresse email",
+    "subscribe": "S'abonner",
+    "subscribing": "Inscription...",
+    "success": "Inscrit ! Veuillez vérifier votre email pour confirmer.",
+    "error": "Échec de l'inscription. Veuillez réessayer."
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur s'est produite",
+    "retry": "Réessayer"
+  },
+  "language": {
+    "switchTo": "Langue"
+  }
+}

@@ -1,0 +1,250 @@
+# OpenStatus Helm Chart Values
+
+# -- Global settings
+global:
+  # -- Image pull secrets (if using private registry)
+  imagePullSecrets: []
+
+# -- Namespace to deploy into (created if doesn't exist)
+namespace: openstatus
+
+# =============================================================================
+# API Service
+# =============================================================================
+api:
+  # -- Number of replicas
+  replicaCount: 1
+
+  image:
+    # -- Image repository
+    repository: openstatus-api
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image tag (defaults to Chart appVersion)
+    tag: ""
+
+  # -- Resource limits and requests
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # -- Service configuration
+  service:
+    type: ClusterIP
+    port: 8080
+
+# =============================================================================
+# Frontend Service (Public Status Page)
+# =============================================================================
+frontend:
+  # -- Number of replicas
+  replicaCount: 1
+
+  image:
+    repository: openstatus-frontend
+    pullPolicy: IfNotPresent
+    tag: ""
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+  service:
+    type: ClusterIP
+    port: 80
+
+# =============================================================================
+# Admin Service
+# =============================================================================
+admin:
+  # -- Number of replicas
+  replicaCount: 1
+
+  image:
+    repository: openstatus-admin
+    pullPolicy: IfNotPresent
+    tag: ""
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+  service:
+    type: ClusterIP
+    port: 80
+
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+ingress:
+  # -- Enable ingress
+  enabled: true
+
+  # -- Ingress class name (e.g., nginx, traefik)
+  className: nginx
+
+  # -- Ingress annotations
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+  # -- TLS configuration
+  tls:
+    # -- Enable TLS
+    enabled: false
+    # -- Secret name containing TLS certificate (auto-generated name if empty)
+    secretName: ""
+
+  # -- Hostnames for each service
+  hosts:
+    # -- Frontend (public status page) hostname
+    frontend: status.example.com
+    # -- Admin dashboard hostname
+    admin: admin.status.example.com
+    # -- API hostname (optional, can be path-based instead)
+    api: api.status.example.com
+
+# =============================================================================
+# MySQL Configuration
+# =============================================================================
+mysql:
+  # -- MySQL deployment mode: "standalone" or "moco"
+  mode: standalone
+
+  # -- Database name
+  database: statuspage
+
+  # -- Database user
+  user: statuspage
+
+  # -- Database password (required if not using existing secret)
+  password: ""
+
+  # -- Root password (standalone mode only)
+  rootPassword: ""
+
+  # -- Use existing secret for passwords
+  # Secret must contain: mysql-password, mysql-root-password
+  existingSecret: ""
+
+  # -----------------------------------------------------------------------------
+  # Standalone MySQL settings
+  # -----------------------------------------------------------------------------
+  standalone:
+    image:
+      repository: mysql
+      tag: "8.4"
+      pullPolicy: IfNotPresent
+
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+    persistence:
+      # -- Enable persistence
+      enabled: true
+      # -- Storage class (empty = default)
+      storageClass: ""
+      # -- PVC size
+      size: 10Gi
+      # -- Access mode
+      accessMode: ReadWriteOnce
+
+  # -----------------------------------------------------------------------------
+  # MOCO (MySQL Operator for Kubernetes) settings
+  # -----------------------------------------------------------------------------
+  moco:
+    # -- MySQLCluster name
+    clusterName: openstatus-mysql
+
+    # -- Number of replicas (1 for single node)
+    replicas: 1
+
+    # -- MySQL version
+    version: "8.4"
+
+    # -- Storage size per replica
+    storageSize: 10Gi
+
+    # -- Storage class (empty = default)
+    storageClass: ""
+
+    # -- Resource limits for MySQL pods
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+# =============================================================================
+# Application Configuration
+# =============================================================================
+config:
+  # -- JWT secret key for authentication (required)
+  # Generate with: openssl rand -base64 32
+  jwtSecretKey: ""
+
+  # -- Use existing secret for JWT key
+  # Secret must contain: jwt-secret-key
+  existingSecret: ""
+
+  # -- Gin mode: debug or release
+  ginMode: release
+
+# =============================================================================
+# Email Configuration
+# =============================================================================
+email:
+  # -- Email provider: disabled, smtp, sendgrid, mailgun, ses
+  provider: disabled
+
+  # -- From email address
+  fromAddress: ""
+
+  # -- From name
+  fromName: "Status Page"
+
+  # SMTP settings (when provider: smtp)
+  smtp:
+    host: ""
+    port: 587
+    username: ""
+    password: ""
+    tls: false
+
+  # SendGrid settings (when provider: sendgrid)
+  sendgrid:
+    apiKey: ""
+
+  # Mailgun settings (when provider: mailgun)
+  mailgun:
+    apiKey: ""
+    domain: ""
+
+  # AWS SES settings (when provider: ses)
+  ses:
+    region: ""
+    accessKey: ""
+    secretKey: ""
+
+  # -- Use existing secret for email credentials
+  # Secret keys depend on provider (e.g., smtp-password, sendgrid-api-key)
+  existingSecret: ""

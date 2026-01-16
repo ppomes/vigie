@@ -1,0 +1,40 @@
+{{- if eq .Values.mysql.mode "moco" }}
+apiVersion: moco.cybozu.com/v1beta2
+kind: MySQLCluster
+metadata:
+  name: {{ .Values.mysql.moco.clusterName }}
+  labels:
+    {{- include "openstatus.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mysql.moco.replicas }}
+  podTemplate:
+    spec:
+      containers:
+        - name: mysqld
+          image: ghcr.io/cybozu-go/moco/mysql:{{ .Values.mysql.moco.version }}
+          resources:
+            {{- toYaml .Values.mysql.moco.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.mysql.moco.storageClass }}
+        storageClassName: {{ .Values.mysql.moco.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.mysql.moco.storageSize }}
+---
+{{- if not .Values.mysql.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "openstatus.mysql.secretName" . }}
+  labels:
+    {{- include "openstatus.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  mysql-password: {{ required "mysql.password is required" .Values.mysql.password | quote }}
+{{- end }}
+{{- end }}

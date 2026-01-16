@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openstatus.fullname" . }}-config
+  labels:
+    {{- include "openstatus.labels" . | nindent 4 }}
+data:
+  DB_HOST: {{ include "openstatus.mysql.host" . | quote }}
+  DB_PORT: "3306"
+  DB_NAME: {{ .Values.mysql.database | quote }}
+  DB_USER: {{ .Values.mysql.user | quote }}
+  GIN_MODE: {{ .Values.config.ginMode | quote }}
+  PORT: "8080"
+  {{- if ne .Values.email.provider "disabled" }}
+  EMAIL_PROVIDER: {{ .Values.email.provider | quote }}
+  EMAIL_FROM: {{ .Values.email.fromAddress | quote }}
+  EMAIL_FROM_NAME: {{ .Values.email.fromName | quote }}
+  {{- if eq .Values.email.provider "smtp" }}
+  SMTP_HOST: {{ .Values.email.smtp.host | quote }}
+  SMTP_PORT: {{ .Values.email.smtp.port | quote }}
+  SMTP_USERNAME: {{ .Values.email.smtp.username | quote }}
+  SMTP_TLS: {{ .Values.email.smtp.tls | quote }}
+  {{- else if eq .Values.email.provider "mailgun" }}
+  MAILGUN_DOMAIN: {{ .Values.email.mailgun.domain | quote }}
+  {{- else if eq .Values.email.provider "ses" }}
+  AWS_REGION: {{ .Values.email.ses.region | quote }}
+  {{- end }}
+  {{- end }}

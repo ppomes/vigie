@@ -1,0 +1,56 @@
+{
+  "status": {
+    "title": "System Status",
+    "description": "Current operational status of all services",
+    "allSystemsOperational": "All Systems Operational",
+    "systemsExperiencingIssues": "Some Systems Experiencing Issues"
+  },
+  "components": {
+    "title": "Components",
+    "noComponents": "No components to display"
+  },
+  "componentStatus": {
+    "operational": "Operational",
+    "degraded_performance": "Degraded Performance",
+    "partial_outage": "Partial Outage",
+    "major_outage": "Major Outage",
+    "under_maintenance": "Under Maintenance"
+  },
+  "incidents": {
+    "title": "Incidents",
+    "noIncidents": "No incidents to display"
+  },
+  "incidentStatus": {
+    "investigating": "Investigating",
+    "identified": "Identified",
+    "monitoring": "Monitoring",
+    "resolved": "Resolved"
+  },
+  "maintenances": {
+    "title": "Scheduled Maintenance",
+    "noMaintenances": "No scheduled maintenance",
+    "component": "Component"
+  },
+  "maintenanceStatus": {
+    "scheduled": "Scheduled",
+    "in_progress": "In Progress",
+    "completed": "Completed"
+  },
+  "subscription": {
+    "title": "Subscribe to Updates",
+    "description": "Get notified when we post status updates",
+    "emailPlaceholder": "Enter your email address",
+    "subscribe": "Subscribe",
+    "subscribing": "Subscribing...",
+    "success": "Subscribed! Please check your email to confirm.",
+    "error": "Failed to subscribe. Please try again."
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry"
+  },
+  "language": {
+    "switchTo": "Language"
+  }
+}

@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-background: #f9fafb;
+  --color-card: #ffffff;
+  --color-card-border: #e5e7eb;
+  --color-text: #111827;
+  --color-text-muted: #6b7280;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-header: #ffffff;
+  --color-header-text: #111827;
+  --color-operational: #22c55e;
+  --color-degraded: #eab308;
+  --color-partial-outage: #f97316;
+  --color-major-outage: #ef4444;
+  --color-investigating: #ef4444;
+  --color-identified: #f97316;
+  --color-monitoring: #eab308;
+  --color-resolved: #22c55e;
+  --color-maintenance: #3b82f6;
+  --color-scheduled: #8b5cf6;
+  --card-radius: 0.5rem;
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card {
+  background-color: var(--color-card);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--color-card-border);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.status-operational { background-color: var(--color-operational); }
+.status-degraded { background-color: var(--color-degraded); }
+.status-partial-outage { background-color: var(--color-partial-outage); }
+.status-major-outage { background-color: var(--color-major-outage); }
+.status-investigating { background-color: var(--color-investigating); }
+.status-identified { background-color: var(--color-identified); }
+.status-monitoring { background-color: var(--color-monitoring); }
+.status-resolved { background-color: var(--color-resolved); }
+.status-maintenance { background-color: var(--color-maintenance); }
+.status-scheduled { background-color: var(--color-scheduled); }
+
+.header-gradient {
+  background: var(--color-header);
+  color: var(--color-header-text);
+}

@@ -1,0 +1,44 @@
+OpenStatus has been deployed!
+
+{{- if .Values.ingress.enabled }}
+
+Access your services at:
+  - Status Page: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.hosts.frontend }}
+  - Admin:       http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.hosts.admin }}
+  {{- if .Values.ingress.hosts.api }}
+  - API:         http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.hosts.api }}
+  {{- end }}
+
+{{- else }}
+
+To access the services, run:
+
+  # Status Page (frontend)
+  kubectl port-forward svc/{{ include "openstatus.fullname" . }}-frontend 3000:{{ .Values.frontend.service.port }}
+
+  # Admin Dashboard
+  kubectl port-forward svc/{{ include "openstatus.fullname" . }}-admin 3001:{{ .Values.admin.service.port }}
+
+  # API
+  kubectl port-forward svc/{{ include "openstatus.fullname" . }}-api 8080:{{ .Values.api.service.port }}
+
+{{- end }}
+
+Default credentials:
+  Username: admin
+  Password: admin
+
+IMPORTANT: Change the default password after first login!
+
+{{- if eq .Values.mysql.mode "moco" }}
+
+MySQL (MOCO):
+  Cluster: {{ .Values.mysql.moco.clusterName }}
+  To check status: kubectl get mysqlcluster {{ .Values.mysql.moco.clusterName }}
+
+{{- else }}
+
+MySQL (Standalone):
+  Service: {{ include "openstatus.fullname" . }}-mysql:3306
+
+{{- end }}

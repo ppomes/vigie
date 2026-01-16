@@ -1,0 +1,109 @@
+{{- if eq .Values.mysql.mode "standalone" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openstatus.fullname" . }}-mysql
+  labels:
+    {{- include "openstatus.labels" . | nindent 4 }}
+    {{- include "openstatus.mysql.selectorLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.mysql.standalone.persistence.accessMode }}
+  {{- if .Values.mysql.standalone.persistence.storageClass }}
+  storageClassName: {{ .Values.mysql.standalone.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.mysql.standalone.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openstatus.fullname" . }}-mysql
+  labels:
+    {{- include "openstatus.labels" . | nindent 4 }}
+    {{- include "openstatus.mysql.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "openstatus.mysql.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "openstatus.mysql.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: mysql
+          image: "{{ .Values.mysql.standalone.image.repository }}:{{ .Values.mysql.standalone.image.tag }}"
+          imagePullPolicy: {{ .Values.mysql.standalone.image.pullPolicy }}
+          ports:
+            - name: mysql
+              containerPort: 3306
+              protocol: TCP
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openstatus.mysql.secretName" . }}
+                  key: mysql-root-password
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mysql.database | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.mysql.user | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openstatus.mysql.secretName" . }}
+                  key: mysql-password
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          resources:
+            {{- toYaml .Values.mysql.standalone.resources | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if .Values.mysql.standalone.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "openstatus.fullname" . }}-mysql
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openstatus.fullname" . }}-mysql
+  labels:
+    {{- include "openstatus.labels" . | nindent 4 }}
+    {{- include "openstatus.mysql.selectorLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3306
+      targetPort: mysql
+      protocol: TCP
+      name: mysql
+  selector:
+    {{- include "openstatus.mysql.selectorLabels" . | nindent 4 }}
+{{- end }}
