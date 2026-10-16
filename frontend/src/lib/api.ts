@@ -5,7 +5,17 @@ export interface Component {
   name: string;
   status: 'operational' | 'degraded_performance' | 'partial_outage' | 'major_outage' | 'under_maintenance';
   description?: string;
+  group_id?: number | null;
   translations?: Translation[];
+}
+
+export interface ComponentGroup {
+  id: number;
+  name: string;
+  // never, always, or operational (collapsed while all components are operational)
+  collapse: 'never' | 'always' | 'operational';
+  translations?: Translation[];
+  components?: Component[];
 }
 
 export interface IncidentUpdate {
@@ -70,6 +80,12 @@ async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise
 export async function getComponents(locale: string = 'en'): Promise<Component[]> {
   const response = await fetchAPI<{ components: Component[] }>(`/components?locale=${locale}`);
   return response.components || [];
+}
+
+// Groups shown on the public page, in order, with their components.
+export async function getComponentGroups(locale: string = 'en'): Promise<ComponentGroup[]> {
+  const response = await fetchAPI<{ component_groups: ComponentGroup[] }>(`/component-groups?locale=${locale}`);
+  return response.component_groups || [];
 }
 
 export async function getIncidents(locale: string = 'en'): Promise<Incident[]> {

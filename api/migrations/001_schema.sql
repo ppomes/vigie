@@ -28,12 +28,27 @@ CREATE TABLE IF NOT EXISTS users (
 -- =============================================================================
 -- COMPONENTS
 -- =============================================================================
+CREATE TABLE IF NOT EXISTS component_groups (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    `order` INT DEFAULT 0,
+    collapse VARCHAR(20) NOT NULL DEFAULT 'never',
+    visibility VARCHAR(20) NOT NULL DEFAULT 'public',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+    INDEX idx_component_groups_deleted_at (deleted_at),
+    CONSTRAINT chk_component_group_collapse CHECK (collapse IN ('never', 'always', 'operational')),
+    CONSTRAINT chk_component_group_visibility CHECK (visibility IN ('public', 'authenticated'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS components (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'operational',
     description TEXT,
     display_order INT DEFAULT 0,
+    group_id BIGINT UNSIGNED NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
@@ -123,7 +138,7 @@ CREATE TABLE IF NOT EXISTS translations (
     INDEX idx_translations_locale (locale),
     INDEX idx_translations_lookup (entity_id, entity_type, locale, field),
     UNIQUE KEY unique_translation (entity_id, entity_type, locale, field),
-    CONSTRAINT chk_translation_entity CHECK (entity_type IN ('component', 'incident', 'maintenance', 'incident_update')),
+    CONSTRAINT chk_translation_entity CHECK (entity_type IN ('component', 'incident', 'maintenance', 'incident_update', 'component_group')),
     CONSTRAINT chk_translation_locale CHECK (locale IN ('en', 'fr')),
     CONSTRAINT chk_translation_field CHECK (field IN ('name', 'description', 'message'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
