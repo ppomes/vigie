@@ -1,0 +1,100 @@
+# CodeRabbit configuration - https://docs.coderabbit.ai/reference/configuration
+# Free for public repositories. Reviews pull requests only.
+language: en-US
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!**/package-lock.json"
+    - "!api/go.sum"
+    - "!**/dist/**"
+    - "!**/node_modules/**"
+  path_instructions:
+    - path: "api/**/*.go"
+      instructions: >
+        Go API built with Gin and GORM on MySQL 8.4. Check that every error
+        is handled or returned, and that database writes spanning several
+        tables run in a transaction. Raw SQL must use placeholders, never
+        string concatenation of request data. Some queries use MySQL-only
+        syntax such as FIELD(); flag new uses, since the Cachet importer
+        will also read PostgreSQL and SQLite.
+    - path: "api/internal/handlers/**"
+      instructions: >
+        HTTP handlers. Routes are wired in api/cmd/api/main.go: public
+        routes, then /api/v1/admin for any logged-in user (read-only), then
+        an adminOnly group guarded by middleware.RequireAdmin(). Any handler
+        that writes data must sit in the adminOnly group, or in a group with
+        an equivalent role check. Responses must never return secrets:
+        email provider keys and passwords are masked with "********", and
+        user password hashes, reset tokens and API keys must not appear.
+        Component status must stay an explicit field set by the API or the
+        admin. Flag any change that recomputes it from incidents without
+        the request asking for it (see issue #6).
+    - path: "api/internal/services/**"
+      instructions: >
+        Email providers (SMTP, SendGrid, Mailgun, SES) and the notification
+        queue. Email bodies are built as HTML strings: incident names and
+        messages typed by admins must be HTML-escaped before insertion.
+        Notifications must stay idempotent: a queued email is claimed
+        atomically and must not be sent twice on retry.
+    - path: "api/internal/models/**"
+      instructions: >
+        GORM models. User-facing text (names, descriptions, messages) is
+        stored per locale in the translations table, in English and
+        French. A new translatable field needs both locales and an entry in
+        the translations CHECK constraints in api/migrations/001_schema.sql.
+        Schema changes must also be reflected in that SQL file, which
+        initialises Docker Compose databases, and in AutoMigrate in
+        api/cmd/api/main.go.
+    - path: "api/**/*_test.go"
+      instructions: >
+        Tests must exercise the real code path. Do not accept tests that
+        only assert on values the test built itself. External services
+        must be replaced with httptest servers, not skipped.
+    - path: "api/migrations/**"
+      instructions: >
+        Initial MySQL schema, loaded by docker-entrypoint-initdb.d on first
+        start only. Existing installations never re-run it, so a change
+        here needs a matching AutoMigrate path or a separate migration.
+    - path: "frontend/src/**"
+      instructions: >
+        Public status page in React, TypeScript and Tailwind, translated
+        with i18next. Every new string needs a key in both
+        frontend/src/i18n/en.json and frontend/src/i18n/fr.json. The page
+        is read by anonymous visitors: never call /api/v1/admin endpoints
+        from here.
+    - path: "admin/src/**"
+      instructions: >
+        Admin interface in React, TypeScript and Tailwind. It talks to the
+        API through admin/src/lib/api.ts. Keep authentication handling
+        there, and do not store tokens anywhere but where api.ts already
+        does.
+    - path: "helm/vigie/**"
+      instructions: >
+        Helm chart. Resource names derive from vigie.fullname. Renaming a
+        PersistentVolumeClaim or the MySQL cluster makes an upgrade start
+        on an empty database: flag any such change.
+    - path: ".github/workflows/**"
+      instructions: >
+        CI. Keep the API job checking that go.mod and go.sum are tidy, and
+        keep npm ci, not npm install, for the front ends.
+  tools:
+    golangci-lint:
+      enabled: true
+    hadolint:
+      enabled: true
+    actionlint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    shellcheck:
+      enabled: true
+
+chat:
+  auto_reply: true
