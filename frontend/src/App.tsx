@@ -249,6 +249,14 @@ function IncidentsList() {
                 </span>
               )}
             </div>
+            {(incident.components || []).length > 1 && (
+              <p className="text-sm text-muted mb-2">
+                {(incident.components || [])
+                  .map(ac => ac.component?.translations?.find(tr => tr.field === 'name')?.value || ac.component?.name)
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            )}
             {(incident.updates || []).length > 0 && (
               <ol className="space-y-2 mb-3 border-l-2 pl-3" style={{ borderColor: 'var(--color-card-border)' }}>
                 {(incident.updates || []).map(update => (
@@ -317,7 +325,7 @@ function MaintenancesList() {
             <p className="text-sm mb-2">{maintenance.message}</p>
           )}
           <div className="text-sm text-muted">
-            <span>{t('maintenances.component')}: {maintenance.component}</span>
+            <span>{t('maintenances.component')}: {(maintenance.components?.length ? maintenance.components : [maintenance.component]).join(', ')}</span>
             <span className="mx-2">|</span>
             <span>{formatDate(maintenance.start_at)} - {formatDate(maintenance.end_at)}</span>
           </div>

@@ -172,7 +172,10 @@ func GetIncidents(db *gorm.DB) gin.HandlerFunc {
 			Preload("Component").
 			Preload("Component.Translations", "locale = ?", locale).
 			Preload("Updates", updatesNewestFirst).
-			Preload("Updates.Translations", "locale = ?", locale)
+			Preload("Updates.Translations", "locale = ?", locale).
+			Preload("Components", func(db *gorm.DB) *gorm.DB { return db.Order("id") }).
+			Preload("Components.Component").
+			Preload("Components.Component.Translations", "locale = ?", locale)
 
 		// Apply status filter if provided
 		if statusFilter != "" {

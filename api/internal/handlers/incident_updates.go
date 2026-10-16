@@ -20,9 +20,11 @@ type CreateIncidentUpdateRequest struct {
 	// Translations holds the update message, per locale. Only the "message"
 	// field is accepted, and at least one message is required.
 	Translations []TranslationRequest `json:"translations"`
-	// ComponentStatus, when set, changes the status of the incident's
+	// ComponentStatus, when set, changes the status of the incident's main
 	// component, as for incidents.
 	ComponentStatus string `json:"component_status" binding:"omitempty,oneof=operational degraded_performance partial_outage major_outage"`
+	// Components sets statuses on components the incident affects.
+	Components []AffectedComponentRequest `json:"components" binding:"omitempty,dive"`
 }
 
 // UpdateIncidentUpdateRequest is the body of PUT /admin/incidents/:id/updates/:update_id.
@@ -98,7 +100,7 @@ func parseID(c *gin.Context, param, label string) (uint, bool) {
 // loadIncidentWithUpdates reloads an incident for an admin response.
 func loadIncidentWithUpdates(db *gorm.DB, id uint) (models.Incident, error) {
 	var incident models.Incident
-	err := db.Preload("Translations").Preload("Component").
+	err := db.Preload("Translations").Preload("Component").Preload("Components").
 		Preload("Updates", updatesNewestFirst).Preload("Updates.Translations").Preload("Updates.User").
 		First(&incident, id).Error
 	return incident, err
@@ -148,11 +150,12 @@ func CreateIncidentUpdate(db *gorm.DB, notificationService *services.Notificatio
 			if err := syncIncidentStatus(tx, incident.ID); err != nil {
 				return err
 			}
-			if req.ComponentStatus != "" {
-				return services.SetComponentStatus(tx, incident.ComponentID, req.ComponentStatus)
-			}
-			return nil
+			return applyUpdateStatuses(tx, incident, req)
 		})
+		if errors.Is(err, errNotAffected) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create incident update"})
 			return
@@ -186,6 +189,47 @@ func CreateIncidentUpdate(db *gorm.DB, notificationService *services.Notificatio
 			"incident": incident,
 		})
 	}
+}
+
+var errNotAffected = errors.New("Component is not affected by this incident")
+
+// applyUpdateStatuses sets the component statuses an update asks for. The
+// components must already be affected by the incident.
+func applyUpdateStatuses(tx *gorm.DB, incident models.Incident, req CreateIncidentUpdateRequest) error {
+	current, err := currentIncidentComponents(tx, incident.ID)
+	if err != nil {
+		return err
+	}
+	affected := idSet(nil)
+	for _, ac := range current {
+		affected[ac.ComponentID] = true
+	}
+	changes := map[uint]string{}
+	if req.ComponentStatus != "" {
+		changes[incident.ComponentID] = req.ComponentStatus
+	}
+	for _, ac := range req.Components {
+		if !affected[ac.ComponentID] {
+			return errNotAffected
+		}
+		if ac.Status != "" {
+			changes[ac.ComponentID] = ac.Status
+		}
+	}
+	if len(changes) == 0 {
+		return nil
+	}
+	for i := range current {
+		if status, ok := changes[current[i].ComponentID]; ok {
+			current[i].Status = status
+			delete(changes, current[i].ComponentID)
+		}
+	}
+	// The legacy main component may predate incident_components.
+	for id, status := range changes {
+		current = append(current, AffectedComponentRequest{ComponentID: id, Status: status})
+	}
+	return applyIncidentComponents(tx, incident.ID, current)
 }
 
 // findIncidentUpdate loads an update and checks it belongs to the incident in

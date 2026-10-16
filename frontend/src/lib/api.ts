@@ -35,6 +35,8 @@ export interface Incident {
   translations?: Translation[];
   // Timeline, newest first
   updates?: IncidentUpdate[];
+  // Every affected component, main one first
+  components?: { component_id: number; component?: Component }[];
   stickied?: boolean;
   // When the incident started; older incidents only have created_at
   occurred_at?: string;
@@ -60,6 +62,8 @@ export interface Maintenance {
   status: 'scheduled' | 'in_progress' | 'completed';
   component_id: number;
   component: string;
+  // Names of every covered component, main one first
+  components?: string[];
   start_at: string;
   end_at: string;
 }
