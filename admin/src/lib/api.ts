@@ -87,6 +87,11 @@ export interface Translation {
   value: string;
 }
 
+// Fields accepted when creating or updating an incident. component_status,
+// when set, changes the status of the affected component; when omitted, the
+// component status is left as it is.
+export type IncidentInput = Partial<Incident> & { component_status?: string };
+
 export interface Incident {
   id: number;
   name: string;
@@ -193,9 +198,9 @@ export const api = {
     fetchAPI<void>(`/admin/components/${id}`, { method: 'DELETE' }),
 
   getIncidents: () => fetchAPI<{ incidents: Incident[] }>('/admin/incidents').then(r => r.incidents || []),
-  createIncident: (data: Partial<Incident>) =>
+  createIncident: (data: IncidentInput) =>
     fetchAPI<Incident>('/admin/incidents', { method: 'POST', body: JSON.stringify(data) }),
-  updateIncident: (id: number, data: Partial<Incident>) =>
+  updateIncident: (id: number, data: IncidentInput) =>
     fetchAPI<Incident>(`/admin/incidents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteIncident: (id: number) =>
     fetchAPI<void>(`/admin/incidents/${id}`, { method: 'DELETE' }),

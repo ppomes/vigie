@@ -33,6 +33,9 @@ type CreateIncidentRequest struct {
 	Name         string                    `json:"name" binding:"required"`
 	Status       string                    `json:"status" binding:"required,oneof=investigating identified monitoring resolved"`
 	ComponentID  uint                      `json:"component_id" binding:"required"`
+	// ComponentStatus, when set, changes the status of the affected
+	// component. When empty, the component status is left as it is.
+	ComponentStatus string                 `json:"component_status" binding:"omitempty,oneof=operational degraded_performance partial_outage major_outage"`
 	Translations []TranslationRequest      `json:"translations"`
 }
 
@@ -41,6 +44,9 @@ type UpdateIncidentRequest struct {
 	Name         string                    `json:"name"`
 	Status       string                    `json:"status" binding:"omitempty,oneof=investigating identified monitoring resolved"`
 	ComponentID  *uint                     `json:"component_id"`
+	// ComponentStatus, when set, changes the status of the affected
+	// component. When empty, the component status is left as it is.
+	ComponentStatus string                 `json:"component_status" binding:"omitempty,oneof=operational degraded_performance partial_outage major_outage"`
 	Translations []TranslationRequest      `json:"translations"`
 }
 
@@ -49,46 +55,6 @@ type TranslationRequest struct {
 	Locale string `json:"locale" binding:"required,oneof=en fr"`
 	Field  string `json:"field" binding:"required"`
 	Value  string `json:"value" binding:"required"`
-}
-
-// incidentStatusToComponentStatus maps incident status to component status
-func incidentStatusToComponentStatus(incidentStatus string) string {
-	switch incidentStatus {
-	case "investigating":
-		return "major_outage"
-	case "identified":
-		return "partial_outage"
-	case "monitoring":
-		return "degraded_performance"
-	case "resolved":
-		return "operational"
-	default:
-		return "degraded_performance"
-	}
-}
-
-// updateComponentStatusFromIncidents checks all active incidents for a component
-// and sets the component status to the worst active incident status
-func updateComponentStatusFromIncidents(tx *gorm.DB, componentID uint) error {
-	// Find the worst active (non-resolved) incident for this component
-	var worstIncident models.Incident
-	err := tx.Where("component_id = ? AND status != ?", componentID, "resolved").
-		Order("FIELD(status, 'investigating', 'identified', 'monitoring')").
-		First(&worstIncident).Error
-
-	var newStatus string
-	if err == gorm.ErrRecordNotFound {
-		// No active incidents, set to operational
-		newStatus = "operational"
-	} else if err != nil {
-		return err
-	} else {
-		// Set status based on worst incident
-		newStatus = incidentStatusToComponentStatus(worstIncident.Status)
-	}
-
-	// Update component status
-	return tx.Model(&models.Component{}).Where("id = ?", componentID).Update("status", newStatus).Error
 }
 
 // CreateComponent handles the creation of a new component
@@ -348,11 +314,13 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			}
 		}
 
-		// Update component status based on incident
-		if err := updateComponentStatusFromIncidents(tx, incident.ComponentID); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
-			return
+		// Change the component status only when the request asks for it
+		if req.ComponentStatus != "" {
+			if err := services.SetComponentStatus(tx, incident.ComponentID, req.ComponentStatus); err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
+				return
+			}
 		}
 
 		// Commit transaction
@@ -407,9 +375,6 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch incident"})
 			return
 		}
-
-		// Track old component ID in case it changes
-		oldComponentID := incident.ComponentID
 
 		// Start transaction
 		tx := db.Begin()
@@ -468,18 +433,12 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			}
 		}
 
-		// Update component status based on incidents
-		if err := updateComponentStatusFromIncidents(tx, incident.ComponentID); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
-			return
-		}
-
-		// If component changed, also update the old component's status
-		if oldComponentID != incident.ComponentID {
-			if err := updateComponentStatusFromIncidents(tx, oldComponentID); err != nil {
+		// Change the component status only when the request asks for it.
+		// Moving an incident to another component leaves both statuses alone.
+		if req.ComponentStatus != "" {
+			if err := services.SetComponentStatus(tx, incident.ComponentID, req.ComponentStatus); err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update old component status"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
 				return
 			}
 		}
@@ -531,8 +490,6 @@ func DeleteIncident(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		componentID := incident.ComponentID
-
 		// Start transaction
 		tx := db.Begin()
 
@@ -540,13 +497,6 @@ func DeleteIncident(db *gorm.DB) gin.HandlerFunc {
 		if err := tx.Delete(&incident).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete incident"})
-			return
-		}
-
-		// Update component status after removing incident
-		if err := updateComponentStatusFromIncidents(tx, componentID); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
 			return
 		}
 

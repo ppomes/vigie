@@ -52,39 +52,6 @@ type UpdateMaintenanceRequest struct {
 	Translations []TranslationRequest `json:"translations"`
 }
 
-// updateComponentStatusFromMaintenances checks if there's an active maintenance for a component
-// and updates its status to under_maintenance, or reverts to operational/incident-based status
-func updateComponentStatusFromMaintenances(tx *gorm.DB, componentID uint) error {
-	now := time.Now()
-
-	// Check if there's an active maintenance (in_progress)
-	var activeMaintenance models.Maintenance
-	err := tx.Where("component_id = ? AND status = ?", componentID, models.MaintenanceInProgress).
-		First(&activeMaintenance).Error
-
-	if err == nil {
-		// Active maintenance found - set component to under_maintenance
-		return tx.Model(&models.Component{}).Where("id = ?", componentID).Update("status", "under_maintenance").Error
-	} else if err != gorm.ErrRecordNotFound {
-		return err
-	}
-
-	// No active maintenance - check for upcoming scheduled maintenance that should be active
-	var scheduledMaintenance models.Maintenance
-	err = tx.Where("component_id = ? AND status = ? AND start_at <= ? AND end_at > ?",
-		componentID, models.MaintenanceScheduled, now, now).
-		First(&scheduledMaintenance).Error
-
-	if err == nil {
-		// Found a maintenance that should be in_progress
-		tx.Model(&scheduledMaintenance).Update("status", models.MaintenanceInProgress)
-		return tx.Model(&models.Component{}).Where("id = ?", componentID).Update("status", "under_maintenance").Error
-	}
-
-	// No active maintenance - check incidents and set appropriate status
-	return updateComponentStatusFromIncidents(tx, componentID)
-}
-
 // ListMaintenances returns all maintenances
 // GET /api/v1/admin/maintenances
 func ListMaintenances(db *gorm.DB) gin.HandlerFunc {
@@ -171,9 +138,9 @@ func CreateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 			}
 		}
 
-		// Update component status if maintenance is in_progress
+		// Put the component under maintenance if it starts right away
 		if status == models.MaintenanceInProgress {
-			if err := updateComponentStatusFromMaintenances(tx, maintenance.ComponentID); err != nil {
+			if err := services.EnterMaintenance(tx, &maintenance); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
 				return
@@ -306,21 +273,26 @@ func UpdateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 			}
 		}
 
-		// Update component statuses if needed
-		if oldComponentID != maintenance.ComponentID {
-			// Update old component's status
-			if err := updateComponentStatusFromMaintenances(tx, oldComponentID); err != nil {
+		// Move component statuses in and out of maintenance. Only the
+		// transitions matter: an unchanged in-progress maintenance leaves the
+		// component alone, so a status set meanwhile is kept.
+		wasActive := oldStatus == models.MaintenanceInProgress
+		isActive := maintenance.Status == models.MaintenanceInProgress
+		componentChanged := oldComponentID != maintenance.ComponentID
+
+		if wasActive && (!isActive || componentChanged) {
+			if err := services.LeaveMaintenance(tx, &maintenance, oldComponentID); err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update old component status"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore component status"})
 				return
 			}
 		}
-
-		// Update current component's status
-		if err := updateComponentStatusFromMaintenances(tx, maintenance.ComponentID); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
-			return
+		if isActive && (!wasActive || componentChanged) {
+			if err := services.EnterMaintenance(tx, &maintenance); err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
+				return
+			}
 		}
 
 		// Commit transaction
@@ -388,11 +360,13 @@ func DeleteMaintenance(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Update component status
-		if err := updateComponentStatusFromMaintenances(tx, componentID); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
-			return
+		// Deleting a maintenance in progress ends it
+		if maintenance.Status == models.MaintenanceInProgress {
+			if err := services.LeaveMaintenance(tx, &maintenance, componentID); err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore component status"})
+				return
+			}
 		}
 
 		// Commit transaction
