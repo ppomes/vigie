@@ -252,3 +252,39 @@ func TestImportedCachetKeyAuthenticates(t *testing.T) {
 		t.Fatalf("imported key: status %d, body %s", w.Code, w.Body.String())
 	}
 }
+
+func TestAPIKeyAuditFailure(t *testing.T) {
+	db := testutil.NewDB(t)
+	r := newAuthRouter(t, db)
+	admin := createUser(t, db, "admin", models.RoleAdmin)
+	token := sessionToken(t, admin.ID)
+	_, id := createKey(t, r, token, map[string]any{"name": "existing"})
+
+	// Make every audit write fail.
+	if err := db.Migrator().DropTable(&models.AuditLog{}); err != nil {
+		t.Fatal(err)
+	}
+	h, v := bearer(token)
+
+	// Creation is refused, and leaves no key behind.
+	w := do(t, r, authRequest{http.MethodPost, "/admin/api-keys", map[string]any{"name": "unaudited"}, h, v})
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("create without audit: status %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+	var count int64
+	db.Model(&models.APIKey{}).Where("name = ?", "unaudited").Count(&count)
+	if count != 0 {
+		t.Fatal("a key was created without its audit entry")
+	}
+
+	// Revocation still goes through.
+	w = do(t, r, authRequest{http.MethodDelete, fmt.Sprintf("/admin/api-keys/%d", id), nil, h, v})
+	if w.Code != http.StatusOK {
+		t.Fatalf("revoke without audit: status %d, want %d", w.Code, http.StatusOK)
+	}
+	var key models.APIKey
+	db.First(&key, id)
+	if key.RevokedAt == nil {
+		t.Fatal("key not revoked when the audit write failed")
+	}
+}

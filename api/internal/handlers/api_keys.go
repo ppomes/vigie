@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -74,16 +75,22 @@ func CreateAPIKey(db *gorm.DB, auditService *services.AuditService) gin.HandlerF
 			return
 		}
 		key := models.NewAPIKey(req.Name, raw, owner.ID)
-		if err := db.Create(&key).Error; err != nil {
+		// The key and its audit entry are written together: no key exists
+		// without a record of who created it.
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Create(&key).Error; err != nil {
+				return err
+			}
+			return auditService.LogTx(tx, c, models.ActionCreate, models.ResourceAPIKey, &key.ID, map[string]interface{}{
+				"name":    key.Name,
+				"user_id": owner.ID,
+			})
+		})
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create API key"})
 			return
 		}
 		key.User = owner
-
-		auditService.Log(c, models.ActionCreate, models.ResourceAPIKey, &key.ID, map[string]interface{}{
-			"name":    key.Name,
-			"user_id": owner.ID,
-		}, true)
 
 		c.JSON(http.StatusCreated, gin.H{
 			"message": "API key created. Copy it now: it will not be shown again.",
@@ -119,9 +126,13 @@ func RevokeAPIKey(db *gorm.DB, auditService *services.AuditService) gin.HandlerF
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to revoke API key"})
 				return
 			}
-			auditService.Log(c, models.ActionDelete, models.ResourceAPIKey, &key.ID, map[string]interface{}{
+			// Revocation is a security action and must not depend on the
+			// audit trail: a failed audit write is logged, not rolled back.
+			if err := auditService.LogTx(db, c, models.ActionDelete, models.ResourceAPIKey, &key.ID, map[string]interface{}{
 				"name": key.Name,
-			}, true)
+			}); err != nil {
+				log.Printf("API key %d revoked, but the audit entry failed: %v", key.ID, err)
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "API key revoked"})

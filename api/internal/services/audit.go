@@ -20,6 +20,19 @@ func NewAuditService(db *gorm.DB) *AuditService {
 
 // Log creates an audit log entry for a user action
 func (s *AuditService) Log(c *gin.Context, action, resource string, resourceID *uint, details map[string]interface{}, success bool) {
+	entry := newAuditEntry(c, action, resource, resourceID, details, success)
+	s.DB.Create(&entry)
+}
+
+// LogTx writes an audit entry with the given transaction and returns the
+// error, so the caller can roll back the audited change when the entry
+// cannot be written.
+func (s *AuditService) LogTx(tx *gorm.DB, c *gin.Context, action, resource string, resourceID *uint, details map[string]interface{}) error {
+	entry := newAuditEntry(c, action, resource, resourceID, details, true)
+	return tx.Create(&entry).Error
+}
+
+func newAuditEntry(c *gin.Context, action, resource string, resourceID *uint, details map[string]interface{}, success bool) models.AuditLog {
 	user, _ := GetCurrentUser(c)
 
 	log := models.AuditLog{
@@ -42,8 +55,7 @@ func (s *AuditService) Log(c *gin.Context, action, resource string, resourceID *
 		detailsJSON, _ := json.Marshal(details)
 		log.Details = string(detailsJSON)
 	}
-
-	s.DB.Create(&log)
+	return log
 }
 
 // LogLogin creates an audit log entry for login attempts

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -192,7 +193,9 @@ func authenticateAPIKey(db *gorm.DB, raw string) (*models.User, *authError) {
 	// Best effort: a failure to record usage must not reject the request.
 	now := time.Now()
 	if key.LastUsedAt == nil || now.Sub(*key.LastUsedAt) > apiKeyTouchInterval {
-		db.Model(&key).UpdateColumn("last_used_at", now)
+		if err := db.Model(&key).UpdateColumn("last_used_at", now).Error; err != nil {
+			log.Printf("Failed to record use of API key %d: %v", key.ID, err)
+		}
 	}
 	return &user, nil
 }
