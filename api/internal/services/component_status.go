@@ -22,16 +22,18 @@ const (
 // the component API, through an incident that asks for it, or for the duration
 // of a maintenance. Nothing recomputes it from incidents.
 
-// SetComponentStatus sets the status of a component.
+// SetComponentStatus sets the status of a component. It returns
+// gorm.ErrRecordNotFound when the component does not exist.
+//
+// Existence is checked separately: MySQL reports zero affected rows for an
+// update that changes nothing, so RowsAffected cannot tell a missing component
+// from a status that is already set.
 func SetComponentStatus(tx *gorm.DB, componentID uint, status string) error {
-	res := tx.Model(&models.Component{}).Where("id = ?", componentID).Update("status", status)
-	if res.Error != nil {
-		return res.Error
+	var component models.Component
+	if err := tx.Select("id").First(&component, componentID).Error; err != nil {
+		return err
 	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return tx.Model(&component).Update("status", status).Error
 }
 
 // otherActiveMaintenance returns another in-progress maintenance on the same

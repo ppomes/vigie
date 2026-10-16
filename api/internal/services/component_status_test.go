@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -144,5 +145,53 @@ func TestWorkerIgnoresOpenIncidents(t *testing.T) {
 	// The open incident must not turn the component into an outage.
 	if got := testutil.ComponentStatus(t, db, c.ID); got != ComponentOperational {
 		t.Fatalf("got %q, want %q", got, ComponentOperational)
+	}
+}
+
+func TestSetComponentStatus(t *testing.T) {
+	db := testutil.NewDB(t)
+	c := testutil.CreateComponent(t, db, "API", ComponentOperational)
+
+	// Setting the status it already has must succeed (MySQL reports zero
+	// affected rows for such an update).
+	inTx(t, db, func(tx *gorm.DB) error { return SetComponentStatus(tx, c.ID, ComponentOperational) })
+	inTx(t, db, func(tx *gorm.DB) error { return SetComponentStatus(tx, c.ID, ComponentMajorOutage) })
+	if got := testutil.ComponentStatus(t, db, c.ID); got != ComponentMajorOutage {
+		t.Fatalf("got %q, want %q", got, ComponentMajorOutage)
+	}
+
+	err := db.Transaction(func(tx *gorm.DB) error { return SetComponentStatus(tx, 999, ComponentOperational) })
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("missing component: got %v, want gorm.ErrRecordNotFound", err)
+	}
+}
+
+func TestWorkerFailureDoesNotBlockOtherMaintenances(t *testing.T) {
+	db := testutil.NewDB(t)
+	c := testutil.CreateComponent(t, db, "API", ComponentOperational)
+	now := time.Now()
+	// The first maintenance points to a component that does not exist, so
+	// starting it fails.
+	broken := createMaintenance(t, db, 999, models.MaintenanceScheduled, now.Add(-time.Minute), now.Add(time.Hour))
+	good := createMaintenance(t, db, c.ID, models.MaintenanceScheduled, now.Add(-time.Minute), now.Add(time.Hour))
+
+	NewMaintenanceWorker(db).updateMaintenanceStatuses()
+
+	var got models.Maintenance
+	if err := db.First(&got, broken.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.MaintenanceScheduled {
+		t.Fatalf("broken maintenance: got %q, want it rolled back to %q", got.Status, models.MaintenanceScheduled)
+	}
+	var started models.Maintenance
+	if err := db.First(&started, good.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if started.Status != models.MaintenanceInProgress {
+		t.Fatalf("good maintenance: got %q, want %q", started.Status, models.MaintenanceInProgress)
+	}
+	if s := testutil.ComponentStatus(t, db, c.ID); s != ComponentUnderMaintenance {
+		t.Fatalf("component: got %q, want %q", s, ComponentUnderMaintenance)
 	}
 }
