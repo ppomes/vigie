@@ -1,4 +1,4 @@
--- OpenStatus Database Schema
+-- Vigie Database Schema
 -- Single consolidated schema for initial setup
 -- Character set: utf8mb4 for full Unicode support
 

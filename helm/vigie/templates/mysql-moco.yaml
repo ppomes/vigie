@@ -4,7 +4,7 @@ kind: MySQLCluster
 metadata:
   name: {{ .Values.mysql.moco.clusterName }}
   labels:
-    {{- include "openstatus.labels" . | nindent 4 }}
+    {{- include "vigie.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.mysql.moco.replicas }}
   podTemplate:
@@ -30,9 +30,9 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "openstatus.mysql.secretName" . }}
+  name: {{ include "vigie.mysql.secretName" . }}
   labels:
-    {{- include "openstatus.labels" . | nindent 4 }}
+    {{- include "vigie.labels" . | nindent 4 }}
 type: Opaque
 stringData:
   mysql-password: {{ required "mysql.password is required" .Values.mysql.password | quote }}

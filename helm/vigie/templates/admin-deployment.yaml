@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "openstatus.fullname" . }}-admin
+  name: {{ include "vigie.fullname" . }}-admin
   labels:
-    {{- include "openstatus.labels" . | nindent 4 }}
-    {{- include "openstatus.admin.selectorLabels" . | nindent 4 }}
+    {{- include "vigie.labels" . | nindent 4 }}
+    {{- include "vigie.admin.selectorLabels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.admin.replicaCount }}
   selector:
     matchLabels:
-      {{- include "openstatus.admin.selectorLabels" . | nindent 6 }}
+      {{- include "vigie.admin.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "openstatus.admin.selectorLabels" . | nindent 8 }}
+        {{- include "vigie.admin.selectorLabels" . | nindent 8 }}
     spec:
-      {{- include "openstatus.imagePullSecrets" . | nindent 6 }}
+      {{- include "vigie.imagePullSecrets" . | nindent 6 }}
       containers:
         - name: admin
           image: "{{ .Values.admin.image.repository }}:{{ .Values.admin.image.tag | default .Chart.AppVersion }}"

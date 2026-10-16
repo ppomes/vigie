@@ -1,5 +1,5 @@
 apiVersion: v2
-name: openstatus
+name: vigie
 description: A simple, self-hosted status page
 type: application
 version: 0.1.0
@@ -8,6 +8,6 @@ keywords:
   - status-page
   - monitoring
   - incidents
-home: https://github.com/ppomes/openstatus
+home: https://github.com/ppomes/vigie
 maintainers:
   - name: ppomes

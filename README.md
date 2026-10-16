@@ -1,4 +1,4 @@
-# OpenStatus
+# Vigie
 
 A simple, self-hosted status page for small teams or personal projects. Built as a learning project to explore Go, React, and Docker.
 
@@ -23,7 +23,7 @@ A simple, self-hosted status page for small teams or personal projects. Built as
 ```bash
 # Clone and start
 git clone <repository-url>
-cd openstatus
+cd vigie
 cp .env.example .env
 # Edit .env to set JWT_SECRET_KEY (use: openssl rand -base64 32)
 docker-compose up -d
@@ -49,7 +49,7 @@ Key environment variables (see `.env.example` for all options):
 ## Project Structure
 
 ```
-openstatus/
+vigie/
 ├── api/           # Go backend
 ├── frontend/      # Public status page (React)
 ├── admin/         # Admin interface (React)

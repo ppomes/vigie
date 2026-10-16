@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "openstatus.fullname" . }}-api
+  name: {{ include "vigie.fullname" . }}-api
   labels:
-    {{- include "openstatus.labels" . | nindent 4 }}
-    {{- include "openstatus.api.selectorLabels" . | nindent 4 }}
+    {{- include "vigie.labels" . | nindent 4 }}
+    {{- include "vigie.api.selectorLabels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.api.replicaCount }}
   selector:
     matchLabels:
-      {{- include "openstatus.api.selectorLabels" . | nindent 6 }}
+      {{- include "vigie.api.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "openstatus.api.selectorLabels" . | nindent 8 }}
+        {{- include "vigie.api.selectorLabels" . | nindent 8 }}
     spec:
-      {{- include "openstatus.imagePullSecrets" . | nindent 6 }}
+      {{- include "vigie.imagePullSecrets" . | nindent 6 }}
       containers:
         - name: api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
@@ -26,47 +26,47 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "openstatus.fullname" . }}-config
+                name: {{ include "vigie.fullname" . }}-config
           env:
             - name: JWT_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "openstatus.config.secretName" . }}
+                  name: {{ include "vigie.config.secretName" . }}
                   key: jwt-secret-key
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "openstatus.mysql.secretName" . }}
+                  name: {{ include "vigie.mysql.secretName" . }}
                   key: mysql-password
             {{- if and (ne .Values.email.provider "disabled") (not .Values.email.existingSecret) }}
             {{- if eq .Values.email.provider "smtp" }}
             - name: SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "openstatus.email.secretName" . }}
+                  name: {{ include "vigie.email.secretName" . }}
                   key: smtp-password
             {{- else if eq .Values.email.provider "sendgrid" }}
             - name: SENDGRID_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "openstatus.email.secretName" . }}
+                  name: {{ include "vigie.email.secretName" . }}
                   key: sendgrid-api-key
             {{- else if eq .Values.email.provider "mailgun" }}
             - name: MAILGUN_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "openstatus.email.secretName" . }}
+                  name: {{ include "vigie.email.secretName" . }}
                   key: mailgun-api-key
             {{- else if eq .Values.email.provider "ses" }}
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "openstatus.email.secretName" . }}
+                  name: {{ include "vigie.email.secretName" . }}
                   key: aws-access-key
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "openstatus.email.secretName" . }}
+                  name: {{ include "vigie.email.secretName" . }}
                   key: aws-secret-key
             {{- end }}
             {{- end }}
