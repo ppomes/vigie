@@ -24,6 +24,7 @@ const (
 	ResourceTemplate    = "templates"
 	ResourceSubscriber  = "subscribers"
 	ResourceSettings    = "settings"
+	ResourceAPIKey      = "api_keys"
 )
 
 // AuditLog represents an audit trail entry for tracking user actions

@@ -229,6 +229,25 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
+-- API KEYS
+-- =============================================================================
+-- Permanent credentials for machine access. Only a SHA-256 hash is stored.
+CREATE TABLE IF NOT EXISTS api_keys (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    key_hash VARCHAR(64) NOT NULL,
+    prefix VARCHAR(16),
+    user_id BIGINT UNSIGNED NOT NULL,
+    last_used_at TIMESTAMP NULL,
+    revoked_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY idx_api_keys_key_hash (key_hash),
+    INDEX idx_api_keys_user_id (user_id),
+    INDEX idx_api_keys_revoked_at (revoked_at),
+    CONSTRAINT fk_api_keys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
 -- DEFAULT DATA
 -- =============================================================================
 

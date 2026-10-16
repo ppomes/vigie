@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog } from './lib/api';
+import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey } from './lib/api';
 
 // User context for role-based access
 interface UserContextType {
@@ -2436,6 +2436,134 @@ function UsersPage() {
   );
 }
 
+function APIKeysPage() {
+  const [keys, setKeys] = useState<APIKey[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState('');
+  const [userId, setUserId] = useState<number | ''>('');
+  const [newKey, setNewKey] = useState<{ name: string; key: string } | null>(null);
+
+  const load = async () => {
+    try {
+      const [k, u] = await Promise.all([api.getAPIKeys(), api.getUsers()]);
+      setKeys(k);
+      setUsers(u.filter(x => x.active));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to load API keys');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const result = await api.createAPIKey({ name, user_id: userId === '' ? undefined : userId });
+      setNewKey({ name: result.api_key.name, key: result.key });
+      setName('');
+      setUserId('');
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create API key');
+    }
+  };
+
+  const handleRevoke = async (k: APIKey) => {
+    if (!confirm(`Revoke the API key "${k.name}"? Tools using it will stop working.`)) return;
+    try {
+      await api.revokeAPIKey(k.id);
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to revoke API key');
+    }
+  };
+
+  const formatDate = (d?: string) => (d ? new Date(d).toLocaleString() : '-');
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-2">API Keys</h2>
+      <p className="text-gray-600 mb-4">
+        Permanent keys for monitoring tools and scripts. A key acts with the role of its user. Send it as
+        <code className="mx-1 px-1 bg-gray-100 rounded">Authorization: Bearer &lt;key&gt;</code>
+        or, for Cachet clients, as
+        <code className="mx-1 px-1 bg-gray-100 rounded">X-Cachet-Token: &lt;key&gt;</code>.
+      </p>
+
+      {newKey && (
+        <div className="bg-green-50 border border-green-300 rounded p-4 mb-4">
+          <p className="font-medium text-green-800 mb-2">
+            Key "{newKey.name}" created. Copy it now: it will not be shown again.
+          </p>
+          <div className="flex gap-2">
+            <code className="flex-1 bg-white border rounded px-3 py-2 break-all">{newKey.key}</code>
+            <button onClick={() => navigator.clipboard?.writeText(newKey.key)} className="bg-green-600 text-white px-3 py-2 rounded">
+              Copy
+            </button>
+            <button onClick={() => setNewKey(null)} className="border px-3 py-2 rounded">Done</button>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleCreate} className="bg-white p-4 rounded shadow mb-4 flex gap-4 items-end">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Zabbix"
+            className="w-full border rounded px-3 py-2" required maxLength={255} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Acts as</label>
+          <select value={userId} onChange={e => setUserId(e.target.value === '' ? '' : parseInt(e.target.value))}
+            className="border rounded px-3 py-2">
+            <option value="">Me</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.username} ({u.role})</option>)}
+          </select>
+        </div>
+        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Create key</button>
+      </form>
+
+      <table className="w-full bg-white rounded shadow">
+        <thead>
+          <tr className="bg-gray-50">
+            <th className="border p-2 text-left">Name</th>
+            <th className="border p-2 text-left">Key</th>
+            <th className="border p-2 text-left">User</th>
+            <th className="border p-2 text-left">Created</th>
+            <th className="border p-2 text-left">Last used</th>
+            <th className="border p-2 text-left">Status</th>
+            <th className="border p-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {keys.map(k => (
+            <tr key={k.id} className={k.revoked_at ? 'text-gray-400' : ''}>
+              <td className="border p-2">{k.name}</td>
+              <td className="border p-2 font-mono text-sm">{k.prefix}…</td>
+              <td className="border p-2">{k.user?.username || k.user_id}</td>
+              <td className="border p-2 text-sm">{formatDate(k.created_at)}</td>
+              <td className="border p-2 text-sm">{formatDate(k.last_used_at)}</td>
+              <td className="border p-2 text-sm">{k.revoked_at ? `Revoked ${formatDate(k.revoked_at)}` : 'Active'}</td>
+              <td className="border p-2 text-center">
+                {!k.revoked_at && (
+                  <button onClick={() => handleRevoke(k)} className="text-red-600 hover:underline">Revoke</button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {keys.length === 0 && (
+            <tr><td colSpan={7} className="border p-4 text-center text-gray-500">No API keys yet.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -2698,6 +2826,7 @@ export default function App() {
 
   const adminTabs = [
     { path: '/users', label: 'Users' },
+    { path: '/api-keys', label: 'API Keys' },
     { path: '/audit', label: 'Audit Log' },
   ];
 
@@ -2749,6 +2878,7 @@ export default function App() {
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               {isAdmin && <Route path="/users" element={<UsersPage />} />}
+              {isAdmin && <Route path="/api-keys" element={<APIKeysPage />} />}
               {isAdmin && <Route path="/audit" element={<AuditPage />} />}
             </Routes>
           </div>
