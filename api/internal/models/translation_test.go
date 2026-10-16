@@ -10,11 +10,11 @@ func TestTranslationLocaleFallback(t *testing.T) {
 
 	translations := []Translation{
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "en",
-			Field:    "name",
-			Value:    "API Service",
+			Locale:     "en",
+			Field:      "name",
+			Value:      "API Service",
 		},
 		// Note: French translation intentionally missing
 	}
@@ -54,18 +54,18 @@ func TestTranslationLookup(t *testing.T) {
 	// Test correct translation returned for locale
 	translations := []Translation{
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "en",
-			Field:    "name",
-			Value:    "Component",
+			Locale:     "en",
+			Field:      "name",
+			Value:      "Component",
 		},
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "fr",
-			Field:    "name",
-			Value:    "Composant",
+			Locale:     "fr",
+			Field:      "name",
+			Value:      "Composant",
 		},
 	}
 
@@ -109,18 +109,18 @@ func TestDefaultEnglish(t *testing.T) {
 	// Test English used when locale not specified
 	translations := []Translation{
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "incident",
-			Locale:   "en",
-			Field:    "message",
-			Value:    "System is operational",
+			Locale:     "en",
+			Field:      "message",
+			Value:      "System is operational",
 		},
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "incident",
-			Locale:   "fr",
-			Field:    "message",
-			Value:    "Le système est opérationnel",
+			Locale:     "fr",
+			Field:      "message",
+			Value:      "Le système est opérationnel",
 		},
 	}
 
@@ -148,18 +148,18 @@ func TestUnsupportedLocaleFallback(t *testing.T) {
 	// Test unsupported locale (e.g., es) falls back to English
 	translations := []Translation{
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "en",
-			Field:    "name",
-			Value:    "Database",
+			Locale:     "en",
+			Field:      "name",
+			Value:      "Database",
 		},
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "fr",
-			Field:    "name",
-			Value:    "Base de données",
+			Locale:     "fr",
+			Field:      "name",
+			Value:      "Base de données",
 		},
 	}
 
@@ -197,20 +197,20 @@ func TestUnsupportedLocaleFallback(t *testing.T) {
 func TestTranslationStructure(t *testing.T) {
 	// Test that translation structure includes all required fields
 	translation := Translation{
-		ID:       1,
-		EntityID: 5,
+		ID:         1,
+		EntityID:   5,
 		EntityType: "incident",
-		Locale:   "en",
-		Field:    "message",
-		Value:    "We are investigating an issue",
+		Locale:     "en",
+		Field:      "message",
+		Value:      "We are investigating an issue",
 	}
 
 	if translation.ID != 1 {
 		t.Errorf("Expected ID=1, got %d", translation.ID)
 	}
 
-	if translation.EntityTypeID != 5 {
-		t.Errorf("Expected EntityID=5, got %d", translation.EntityTypeID)
+	if translation.EntityID != 5 {
+		t.Errorf("Expected EntityID=5, got %d", translation.EntityID)
 	}
 
 	if translation.EntityType != "incident" {
@@ -236,11 +236,11 @@ func TestTranslationEntities(t *testing.T) {
 
 	for _, entity := range validEntities {
 		translation := Translation{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: entity,
-			Locale:   "en",
-			Field:    "name",
-			Value:    "Test",
+			Locale:     "en",
+			Field:      "name",
+			Value:      "Test",
 		}
 
 		if translation.EntityType != entity {
@@ -255,11 +255,11 @@ func TestTranslationLocales(t *testing.T) {
 
 	for _, locale := range validLocales {
 		translation := Translation{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   locale,
-			Field:    "name",
-			Value:    "Test",
+			Locale:     locale,
+			Field:      "name",
+			Value:      "Test",
 		}
 
 		if translation.Locale != locale {
@@ -274,11 +274,11 @@ func TestTranslationFields(t *testing.T) {
 
 	for _, field := range validFields {
 		translation := Translation{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "incident",
-			Locale:   "en",
-			Field:    field,
-			Value:    "Test value",
+			Locale:     "en",
+			Field:      field,
+			Value:      "Test value",
 		}
 
 		if translation.Field != field {
@@ -291,32 +291,32 @@ func TestMultipleTranslationsPerEntity(t *testing.T) {
 	// Test that an entity can have multiple translations (different locales)
 	translations := []Translation{
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "en",
-			Field:    "name",
-			Value:    "API",
+			Locale:     "en",
+			Field:      "name",
+			Value:      "API",
 		},
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "fr",
-			Field:    "name",
-			Value:    "API",
+			Locale:     "fr",
+			Field:      "name",
+			Value:      "API",
 		},
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "en",
-			Field:    "description",
-			Value:    "API service for handling requests",
+			Locale:     "en",
+			Field:      "description",
+			Value:      "API service for handling requests",
 		},
 		{
-			EntityID: 1,
+			EntityID:   1,
 			EntityType: "component",
-			Locale:   "fr",
-			Field:    "description",
-			Value:    "Service API pour traiter les demandes",
+			Locale:     "fr",
+			Field:      "description",
+			Value:      "Service API pour traiter les demandes",
 		},
 	}
 

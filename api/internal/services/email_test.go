@@ -1,6 +1,9 @@
 package services
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -102,8 +105,11 @@ func TestEmailServiceInitialization(t *testing.T) {
 			t.Error("Expected nil service when API key is missing")
 		}
 
-		if !strings.Contains(err.Error(), "SENDGRID_API_KEY") {
-			t.Errorf("Expected error message to mention SENDGRID_API_KEY, got: %v", err)
+		// The env-based constructor shares its validation with the
+		// database-backed config, so the message names the setting,
+		// not the environment variable.
+		if err != nil && !strings.Contains(err.Error(), "SendGrid API key") {
+			t.Errorf("Expected error message to mention the SendGrid API key, got: %v", err)
 		}
 	})
 
@@ -286,9 +292,9 @@ func TestEmailRecipientValidation(t *testing.T) {
 
 			// Simple validation check
 			isValid := strings.Contains(email, "@") &&
-				       strings.Contains(email, ".") &&
-				       len(email) > 5 &&
-				       !strings.Contains(email, " ")
+				strings.Contains(email, ".") &&
+				len(email) > 5 &&
+				!strings.Contains(email, " ")
 
 			if email == "" || email == "invalid" || email == "@example.com" || email == "user@" {
 				isValid = false
@@ -301,80 +307,76 @@ func TestEmailRecipientValidation(t *testing.T) {
 	}
 }
 
-func TestConfirmationEmailContent(t *testing.T) {
-	// Test that confirmation email has correct content
+// captureSendGrid returns a SendGrid service pointed at a local test server,
+// and a function returning the last message that server received.
+func captureSendGrid(t *testing.T) (*SendGridService, func() SendGridMessage) {
+	t.Helper()
+
+	var got SendGridMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mail/send" {
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("invalid SendGrid payload: %v", err)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(server.Close)
+
 	service := &SendGridService{
 		APIKey:   "test-key",
 		FromAddr: "noreply@example.com",
-		BaseURL:  "https://api.sendgrid.com/v3",
+		BaseURL:  server.URL,
+	}
+	return service, func() SendGridMessage { return got }
+}
+
+func TestConfirmationEmailContent(t *testing.T) {
+	service, sent := captureSendGrid(t)
+	t.Setenv("API_URL", "http://localhost:8080")
+
+	if err := service.SendConfirmationEmail("reader@example.com", "test-token-123"); err != nil {
+		t.Fatalf("SendConfirmationEmail failed: %v", err)
 	}
 
-	os.Setenv("API_URL", "http://localhost:8080")
-	defer os.Unsetenv("API_URL")
-
-	confirmationToken := "test-token-123"
-	expectedURL := "http://localhost:8080/api/v1/confirm?token=" + confirmationToken
-
-	// Simulate confirmation email HTML content generation
-	htmlContent := "Please click the link to confirm: " + expectedURL
-
-	// Verify content contains required elements
-	if !strings.Contains(htmlContent, confirmationToken) {
-		t.Error("Confirmation email should contain the confirmation token")
+	msg := sent()
+	if len(msg.Personalizations) != 1 || msg.Personalizations[0].To[0].Email != "reader@example.com" {
+		t.Errorf("unexpected recipients: %+v", msg.Personalizations)
 	}
-
-	if !strings.Contains(htmlContent, "/api/v1/confirm") {
-		t.Error("Confirmation email should contain the confirmation endpoint")
+	if len(msg.Content) != 1 {
+		t.Fatalf("expected one content part, got %d", len(msg.Content))
 	}
-
-	if !strings.Contains(htmlContent, "http://localhost:8080") {
-		t.Error("Confirmation email should contain the API URL")
+	body := msg.Content[0].Value
+	if want := "http://localhost:8080/api/v1/confirm?token=test-token-123"; !strings.Contains(body, want) {
+		t.Errorf("confirmation email should contain %q", want)
 	}
 }
 
 func TestIncidentNotificationContent(t *testing.T) {
-	// Test that incident email has correct content
-	service := &SendGridService{
-		APIKey:   "test-key",
-		FromAddr: "noreply@example.com",
-		BaseURL:  "https://api.sendgrid.com/v3",
+	service, sent := captureSendGrid(t)
+	t.Setenv("API_URL", "http://localhost:8080")
+
+	err := service.SendIncidentNotification("reader@example.com", "API Outage", "investigating",
+		"We are investigating an issue with the API", "unsubscribe-token-456")
+	if err != nil {
+		t.Fatalf("SendIncidentNotification failed: %v", err)
 	}
 
-	os.Setenv("API_URL", "http://localhost:8080")
-	defer os.Unsetenv("API_URL")
-
-	incidentName := "API Outage"
-	incidentStatus := "investigating"
-	incidentMessage := "We are investigating an issue with the API"
-	unsubscribeToken := "unsubscribe-token-456"
-
-	expectedUnsubscribeURL := "http://localhost:8080/api/v1/unsubscribe?token=" + unsubscribeToken
-
-	// Simulate incident notification HTML content generation
-	htmlContent := "Incident: " + incidentName +
-		           " Status: " + incidentStatus +
-		           " Message: " + incidentMessage +
-		           " Unsubscribe: " + expectedUnsubscribeURL
-
-	// Verify content contains required elements
-	if !strings.Contains(htmlContent, incidentName) {
-		t.Error("Incident email should contain the incident name")
+	msg := sent()
+	if len(msg.Content) != 1 {
+		t.Fatalf("expected one content part, got %d", len(msg.Content))
 	}
-
-	if !strings.Contains(htmlContent, incidentStatus) {
-		t.Error("Incident email should contain the incident status")
-	}
-
-	if !strings.Contains(htmlContent, incidentMessage) {
-		t.Error("Incident email should contain the incident message")
-	}
-
-	if !strings.Contains(htmlContent, unsubscribeToken) {
-		t.Error("Incident email should contain the unsubscribe token")
-	}
-
-	if !strings.Contains(htmlContent, "/api/v1/unsubscribe") {
-		t.Error("Incident email should contain the unsubscribe endpoint")
+	body := msg.Content[0].Value
+	for _, want := range []string{
+		"API Outage",
+		"investigating",
+		"We are investigating an issue with the API",
+		"http://localhost:8080/api/v1/unsubscribe?token=unsubscribe-token-456",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("incident email should contain %q", want)
+		}
 	}
 }
 
