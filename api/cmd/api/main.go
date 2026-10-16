@@ -49,6 +49,7 @@ func main() {
 		&models.APIKey{},
 		&models.IncidentUpdate{},
 		&models.ComponentGroup{},
+		&models.Tag{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}

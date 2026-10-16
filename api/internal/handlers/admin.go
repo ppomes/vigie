@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"time"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,6 +20,7 @@ type CreateComponentRequest struct {
 	Order  int                       `json:"order"`
 	// GroupID puts the component in a group. 0 or absent means no group.
 	GroupID *uint                    `json:"group_id"`
+	componentExtras
 	Translations []TranslationRequest `json:"translations"`
 }
 
@@ -30,6 +32,7 @@ type UpdateComponentRequest struct {
 	// GroupID moves the component to a group; 0 removes it from its group.
 	// Absent leaves it unchanged.
 	GroupID *uint                    `json:"group_id"`
+	componentExtras
 	Translations []TranslationRequest `json:"translations"`
 }
 
@@ -41,7 +44,42 @@ type CreateIncidentRequest struct {
 	// ComponentStatus, when set, changes the status of the affected
 	// component. When empty, the component status is left as it is.
 	ComponentStatus string                 `json:"component_status" binding:"omitempty,oneof=operational degraded_performance partial_outage major_outage"`
+	incidentExtras
+	// Notify is false to create the incident without notifying
+	// subscribers. It defaults to true.
+	Notify       *bool                     `json:"notify"`
 	Translations []TranslationRequest      `json:"translations"`
+}
+
+// incidentExtras are the optional incident fields shared by create and
+// update requests. A nil field is left unchanged.
+type incidentExtras struct {
+	// Visible false keeps the incident off the public page, and from
+	// subscribers.
+	Visible *bool `json:"visible"`
+	// Stickied pins the incident at the top of the public page.
+	Stickied *bool `json:"stickied"`
+	// OccurredAt is when the incident started. It defaults to now.
+	OccurredAt *time.Time `json:"occurred_at"`
+}
+
+// apply writes the extras on a saved incident, through a map so false is
+// written (GORM skips zero values in structs).
+func (e incidentExtras) apply(tx *gorm.DB, incident *models.Incident) error {
+	updates := map[string]any{}
+	if e.Visible != nil {
+		updates["visible"] = *e.Visible
+	}
+	if e.Stickied != nil {
+		updates["stickied"] = *e.Stickied
+	}
+	if e.OccurredAt != nil {
+		updates["occurred_at"] = *e.OccurredAt
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return tx.Model(incident).Updates(updates).Error
 }
 
 // UpdateIncidentRequest represents the request to update an incident
@@ -52,6 +90,7 @@ type UpdateIncidentRequest struct {
 	// ComponentStatus, when set, changes the status of the affected
 	// component. When empty, the component status is left as it is.
 	ComponentStatus string                 `json:"component_status" binding:"omitempty,oneof=operational degraded_performance partial_outage major_outage"`
+	incidentExtras
 	Translations []TranslationRequest      `json:"translations"`
 }
 
@@ -74,6 +113,10 @@ func CreateComponent(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		if msg := req.componentExtras.validate(); msg != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+			return
+		}
 		groupID, ok := resolveGroupID(c, db, req.GroupID)
 		if !ok {
 			return
@@ -113,6 +156,12 @@ func CreateComponent(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
+		if err := req.componentExtras.apply(tx, &component); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save component details"})
+			return
+		}
+
 		// Commit transaction
 		if err := tx.Commit().Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save component"})
@@ -120,7 +169,7 @@ func CreateComponent(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// Reload component with translations
-		db.Preload("Translations").First(&component, component.ID)
+		db.Preload("Translations").Preload("Tags").First(&component, component.ID)
 
 		c.JSON(http.StatusCreated, gin.H{
 			"message":   "Component created successfully",
@@ -143,6 +192,10 @@ func UpdateComponent(db *gorm.DB) gin.HandlerFunc {
 		var req UpdateComponentRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format", "details": err.Error()})
+			return
+		}
+		if msg := req.componentExtras.validate(); msg != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 			return
 		}
 
@@ -211,6 +264,12 @@ func UpdateComponent(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
+		if err := req.componentExtras.apply(tx, &component); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save component details"})
+			return
+		}
+
 		// Commit transaction
 		if err := tx.Commit().Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save component"})
@@ -218,7 +277,7 @@ func UpdateComponent(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// Reload component with translations
-		db.Preload("Translations").First(&component, component.ID)
+		db.Preload("Translations").Preload("Tags").First(&component, component.ID)
 
 		c.JSON(http.StatusOK, gin.H{
 			"message":   "Component updated successfully",
@@ -266,7 +325,7 @@ func DeleteComponent(db *gorm.DB) gin.HandlerFunc {
 func ListComponents(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var components []models.Component
-		if err := models.ByDisplayOrder(db).Preload("Translations").Find(&components).Error; err != nil {
+		if err := models.ByDisplayOrder(db).Preload("Translations").Preload("Tags").Find(&components).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch components"})
 			return
 		}
@@ -300,11 +359,18 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			return
 		}
 
+		notify := req.Notify == nil || *req.Notify
+		now := time.Now()
+
 		// Create incident
 		incident := models.Incident{
 			Name:        req.Name,
 			Status:      req.Status,
 			ComponentID: req.ComponentID,
+			OccurredAt:  &now,
+		}
+		if user, _ := services.GetCurrentUser(c); user != nil {
+			incident.UserID = &user.ID
 		}
 
 		// Start transaction
@@ -342,6 +408,23 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			}
 		}
 
+		extras := map[string]any{}
+		if !notify {
+			extras["notifications"] = false
+		}
+		if len(extras) > 0 {
+			if err := tx.Model(&incident).Updates(extras).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save incident"})
+				return
+			}
+		}
+		if err := req.incidentExtras.apply(tx, &incident); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save incident details"})
+			return
+		}
+
 		// Commit transaction
 		if err := tx.Commit().Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save incident"})
@@ -351,8 +434,9 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		// Reload incident with translations and component
 		db.Preload("Translations").Preload("Component").First(&incident, incident.ID)
 
-		// Send notifications to subscribers (async, non-blocking)
-		if notificationService != nil {
+		// Send notifications to subscribers (async, non-blocking), unless
+		// asked not to, or the incident is internal.
+		if notificationService != nil && incident.Notifications && incident.Visible {
 			go func() {
 				if err := notificationService.NotifyIncidentCreated(&incident); err != nil {
 					log.Printf("Failed to send incident creation notifications: %v", err)
@@ -462,6 +546,12 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			}
 		}
 
+		if err := req.incidentExtras.apply(tx, &incident); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save incident details"})
+			return
+		}
+
 		// Commit transaction
 		if err := tx.Commit().Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save incident"})
@@ -472,7 +562,7 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		db.Preload("Translations").Preload("Component").First(&incident, incident.ID)
 
 		// Send notifications to subscribers (async, non-blocking)
-		if notificationService != nil {
+		if notificationService != nil && incident.Notifications && incident.Visible {
 			go func() {
 				if err := notificationService.NotifyIncidentUpdated(&incident); err != nil {
 					log.Printf("Failed to send incident update notifications: %v", err)

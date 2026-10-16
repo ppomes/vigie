@@ -6,6 +6,7 @@ export interface Component {
   status: 'operational' | 'degraded_performance' | 'partial_outage' | 'major_outage' | 'under_maintenance';
   description?: string;
   group_id?: number | null;
+  link?: string;
   translations?: Translation[];
 }
 
@@ -34,6 +35,9 @@ export interface Incident {
   translations?: Translation[];
   // Timeline, newest first
   updates?: IncidentUpdate[];
+  stickied?: boolean;
+  // When the incident started; older incidents only have created_at
+  occurred_at?: string;
   created_at: string;
   updated_at: string;
 }

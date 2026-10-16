@@ -18,7 +18,8 @@
   },
   "incidents": {
     "title": "Incidents",
-    "noIncidents": "Aucun incident à afficher"
+    "noIncidents": "Aucun incident à afficher",
+    "pinned": "Épinglé"
   },
   "incidentStatus": {
     "investigating": "En cours d'investigation",

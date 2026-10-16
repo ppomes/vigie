@@ -102,6 +102,18 @@ function componentName(component: Component, locale: string): string {
   return component.translations?.find(tr => tr.field === 'name' && tr.locale === locale)?.value || component.name;
 }
 
+// A component name, linked to the service when the component has a link.
+function ComponentName({ component, name, className }: { component: Component; name: string; className: string }) {
+  if (component.link) {
+    return (
+      <a href={component.link} target="_blank" rel="noopener noreferrer" className={`${className} hover:underline`}>
+        {name}
+      </a>
+    );
+  }
+  return <span className={className}>{name}</span>;
+}
+
 function ComponentRow({ component, asSidebar }: { component: Component; asSidebar: boolean }) {
   const { t, i18n } = useTranslation();
   const name = componentName(component, i18n.language);
@@ -109,7 +121,7 @@ function ComponentRow({ component, asSidebar }: { component: Component; asSideba
     return (
       <div className="flex items-center gap-2 py-2">
         <div className={`w-2 h-2 rounded-full ${statusClasses[component.status]}`} />
-        <span className="text-sm">{name}</span>
+        <ComponentName component={component} name={name} className="text-sm" />
       </div>
     );
   }
@@ -117,7 +129,7 @@ function ComponentRow({ component, asSidebar }: { component: Component; asSideba
     <div className="flex items-center justify-between py-3 border-b last:border-0" style={{ borderColor: 'var(--color-card-border)' }}>
       <div className="flex items-center gap-3">
         <div className={`w-3 h-3 rounded-full ${statusClasses[component.status]}`} />
-        <span className="font-medium">{name}</span>
+        <ComponentName component={component} name={name} className="font-medium" />
       </div>
       <span className="text-sm text-muted">{t(`componentStatus.${component.status}`)}</span>
     </div>
@@ -231,6 +243,11 @@ function IncidentsList() {
               <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--color-card-border)' }}>
                 {t(`incidentStatus.${incident.status}`)}
               </span>
+              {incident.stickied && (
+                <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--color-card-border)' }}>
+                  {t('incidents.pinned')}
+                </span>
+              )}
             </div>
             {(incident.updates || []).length > 0 && (
               <ol className="space-y-2 mb-3 border-l-2 pl-3" style={{ borderColor: 'var(--color-card-border)' }}>
@@ -249,7 +266,7 @@ function IncidentsList() {
               <p className="text-sm mb-2">{incidentMessage}</p>
             )}
             <p className="text-sm text-muted">
-              {new Date(incident.created_at).toLocaleString()}
+              {new Date(incident.occurred_at || incident.created_at).toLocaleString()}
             </p>
           </div>
         );

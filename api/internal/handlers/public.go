@@ -24,21 +24,21 @@ func GetStatus(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Count total components
 		var componentCount int64
-		if err := db.Model(&models.Component{}).Count(&componentCount).Error; err != nil {
+		if err := db.Model(&models.Component{}).Scopes(publicComponents).Count(&componentCount).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch system status"})
 			return
 		}
 
 		// Count active incidents (not resolved)
 		var activeIncidents int64
-		if err := db.Model(&models.Incident{}).Where("status != ?", "resolved").Count(&activeIncidents).Error; err != nil {
+		if err := db.Model(&models.Incident{}).Scopes(publicIncidents).Where("status != ?", "resolved").Count(&activeIncidents).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch system status"})
 			return
 		}
 
 		// Count components with issues
 		var componentsWithIssues int64
-		if err := db.Model(&models.Component{}).
+		if err := db.Model(&models.Component{}).Scopes(publicComponents).
 			Where("status IN ?", []string{"degraded_performance", "partial_outage", "major_outage"}).
 			Count(&componentsWithIssues).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch system status"})
@@ -51,7 +51,7 @@ func GetStatus(db *gorm.DB) gin.HandlerFunc {
 
 		if componentsWithIssues > 0 {
 			var majorOutages int64
-			db.Model(&models.Component{}).Where("status = ?", "major_outage").Count(&majorOutages)
+			db.Model(&models.Component{}).Scopes(publicComponents).Where("status = ?", "major_outage").Count(&majorOutages)
 
 			if majorOutages > 0 {
 				status = "outage"
@@ -82,7 +82,7 @@ func GetComponents(db *gorm.DB) gin.HandlerFunc {
 		// Components in a group hidden from the public are left out.
 		var components []models.Component
 		if err := models.ByDisplayOrder(db).Preload("Translations", "locale = ?", locale).
-			Where("group_id IS NULL OR group_id IN (?)", publicGroupIDs(db)).
+			Scopes(publicComponents).
 			Find(&components).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch components"})
 			return
@@ -100,6 +100,23 @@ func publicGroupIDs(db *gorm.DB) *gorm.DB {
 	return db.Model(&models.ComponentGroup{}).Select("id").Where("visibility = ?", models.GroupVisibilityPublic)
 }
 
+// publicComponents restricts a component query to what the public page
+// shows: enabled components, outside groups hidden from the public.
+func publicComponents(db *gorm.DB) *gorm.DB {
+	return db.Where("enabled = ?", true).
+		Where("group_id IS NULL OR group_id IN (?)", publicGroupIDs(db.Session(&gorm.Session{NewDB: true})))
+}
+
+// enabledComponents restricts a preloaded group's components to enabled ones.
+func enabledComponents(db *gorm.DB) *gorm.DB {
+	return models.ByDisplayOrder(db).Where("enabled = ?", true)
+}
+
+// publicIncidents restricts an incident query to visible incidents.
+func publicIncidents(db *gorm.DB) *gorm.DB {
+	return db.Where("visible = ?", true)
+}
+
 // GetComponentGroups returns the groups shown on the public page, in order,
 // with their components and translations in the requested locale.
 // GET /api/v1/component-groups
@@ -111,7 +128,7 @@ func GetComponentGroups(db *gorm.DB) gin.HandlerFunc {
 		if err := models.ByDisplayOrder(db).
 			Where("visibility = ?", models.GroupVisibilityPublic).
 			Preload("Translations", "locale = ?", locale).
-			Preload("Components", models.ByDisplayOrder).
+			Preload("Components", enabledComponents).
 			Preload("Components.Translations", "locale = ?", locale).
 			Find(&groups).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch component groups"})
@@ -162,9 +179,13 @@ func GetIncidents(db *gorm.DB) gin.HandlerFunc {
 			query = query.Where("status = ?", statusFilter)
 		}
 
-		// Fetch incidents ordered by creation date (newest first)
+		// Visible incidents only: stickied ones first, then the most recent
+		// by when they occurred. Incidents created before occurred_at existed
+		// fall back to their creation time.
 		var incidents []models.Incident
-		if err := query.Order("created_at DESC").Find(&incidents).Error; err != nil {
+		if err := query.Scopes(publicIncidents).
+			Order("stickied DESC").Order("COALESCE(occurred_at, created_at) DESC").Order("id DESC").
+			Find(&incidents).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch incidents"})
 			return
 		}
