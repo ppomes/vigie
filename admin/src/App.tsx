@@ -135,6 +135,8 @@ interface IncidentForm {
   name: string;
   status: string;
   component_id: number;
+  // Empty means "leave the component status as it is"
+  component_status: string;
   name_en: string;
   name_fr: string;
   message_en: string;
@@ -145,11 +147,28 @@ const defaultIncidentForm: IncidentForm = {
   name: '',
   status: 'investigating',
   component_id: 0,
+  component_status: '',
   name_en: '',
   name_fr: '',
   message_en: '',
   message_fr: '',
 };
+
+// The incident form only changes the component status when asked to.
+function ComponentStatusSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Component status</label>
+      <select value={value} onChange={e => onChange(e.target.value)} className="w-full border rounded px-3 py-2">
+        <option value="">Leave unchanged</option>
+        <option value="operational">Operational</option>
+        <option value="degraded_performance">Degraded performance</option>
+        <option value="partial_outage">Partial outage</option>
+        <option value="major_outage">Major outage</option>
+      </select>
+    </div>
+  );
+}
 
 function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -219,6 +238,7 @@ function IncidentsPage() {
           name: preview.name_en || selectedTemplate?.name || 'Incident',
           status: selectedTemplate?.default_status || 'investigating',
           component_id: form.component_id,
+          component_status: form.component_status || undefined,
           translations: [
             { locale: 'en', field: 'name', value: preview.name_en },
             { locale: 'fr', field: 'name', value: preview.name_fr },
@@ -231,6 +251,7 @@ function IncidentsPage() {
           name: form.name,
           status: form.status,
           component_id: form.component_id,
+          component_status: form.component_status || undefined,
           translations: buildTranslations(),
         };
       }
@@ -261,6 +282,7 @@ function IncidentsPage() {
       name: i.name,
       status: i.status,
       component_id: i.component_id,
+      component_status: '',
       name_en: getTranslation('name', 'en'),
       name_fr: getTranslation('name', 'fr'),
       message_en: getTranslation('message', 'en'),
@@ -348,6 +370,8 @@ function IncidentsPage() {
                   {components.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+
+              <ComponentStatusSelect value={form.component_status} onChange={v => setForm({...form, component_status: v})} />
 
               {/* Variable inputs */}
               {selectedTemplate && selectedTemplate.parsed_variables && selectedTemplate.parsed_variables.length > 0 && (
@@ -450,6 +474,8 @@ function IncidentsPage() {
                   {components.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+
+              <ComponentStatusSelect value={form.component_status} onChange={v => setForm({...form, component_status: v})} />
 
               <div className="border-t pt-4">
                 <h4 className="font-medium mb-2">Translations</h4>

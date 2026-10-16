@@ -63,106 +63,70 @@ func (m *MaintenanceWorker) processMaintenanceStatuses() {
 	}
 }
 
-// updateMaintenanceStatuses checks all active maintenances and updates their statuses
+// updateMaintenanceStatuses starts scheduled maintenances whose window has
+// begun, and completes in-progress ones whose window has ended.
+//
+// Each maintenance is handled in its own transaction: a failure rolls back
+// that maintenance alone, which is retried on the next tick, and does not
+// block the others.
 func (m *MaintenanceWorker) updateMaintenanceStatuses() {
 	now := time.Now()
 
-	// Start transaction
-	tx := m.DB.Begin()
-
 	// Find scheduled maintenances that should now be in_progress
 	var scheduledMaintenances []models.Maintenance
-	if err := tx.Where("status = ? AND start_at <= ? AND end_at > ?",
+	if err := m.DB.Where("status = ? AND start_at <= ? AND end_at > ?",
 		models.MaintenanceScheduled, now, now).
-		Find(&scheduledMaintenances).Error; err != nil {
-		tx.Rollback()
+		Order("id").Find(&scheduledMaintenances).Error; err != nil {
 		log.Printf("Maintenance worker: Error fetching scheduled maintenances: %v", err)
 		return
 	}
 
-	// Update scheduled -> in_progress
-	for _, maintenance := range scheduledMaintenances {
-		if err := tx.Model(&maintenance).Update("status", models.MaintenanceInProgress).Error; err != nil {
-			log.Printf("Maintenance worker: Error updating maintenance %d to in_progress: %v", maintenance.ID, err)
+	started := 0
+	for i := range scheduledMaintenances {
+		maintenance := &scheduledMaintenances[i]
+		err := m.DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(maintenance).Update("status", models.MaintenanceInProgress).Error; err != nil {
+				return err
+			}
+			maintenance.Status = models.MaintenanceInProgress
+			return EnterMaintenance(tx, maintenance)
+		})
+		if err != nil {
+			log.Printf("Maintenance worker: Error starting maintenance %d: %v", maintenance.ID, err)
 			continue
 		}
-
-		// Update component status to under_maintenance
-		if err := tx.Model(&models.Component{}).Where("id = ?", maintenance.ComponentID).
-			Update("status", "under_maintenance").Error; err != nil {
-			log.Printf("Maintenance worker: Error updating component %d status: %v", maintenance.ComponentID, err)
-		}
-
+		started++
 		log.Printf("Maintenance %d (%s) started - now in_progress", maintenance.ID, maintenance.Name)
 	}
 
 	// Find in_progress maintenances that should now be completed
 	var activeMaintenances []models.Maintenance
-	if err := tx.Where("status = ? AND end_at <= ?",
+	if err := m.DB.Where("status = ? AND end_at <= ?",
 		models.MaintenanceInProgress, now).
-		Find(&activeMaintenances).Error; err != nil {
-		tx.Rollback()
+		Order("id").Find(&activeMaintenances).Error; err != nil {
 		log.Printf("Maintenance worker: Error fetching active maintenances: %v", err)
 		return
 	}
 
-	// Update in_progress -> completed
-	for _, maintenance := range activeMaintenances {
-		if err := tx.Model(&maintenance).Update("status", models.MaintenanceCompleted).Error; err != nil {
-			log.Printf("Maintenance worker: Error updating maintenance %d to completed: %v", maintenance.ID, err)
-			continue
-		}
-
-		// Update component status - check for active incidents first
-		componentID := maintenance.ComponentID
-		newStatus := "operational"
-
-		// Check if there are any active incidents for this component
-		var worstIncident models.Incident
-		err := tx.Where("component_id = ? AND status != ?", componentID, "resolved").
-			Order("FIELD(status, 'investigating', 'identified', 'monitoring')").
-			First(&worstIncident).Error
-
-		if err == nil {
-			// Active incident found - set status based on incident
-			switch worstIncident.Status {
-			case "investigating":
-				newStatus = "major_outage"
-			case "identified":
-				newStatus = "partial_outage"
-			case "monitoring":
-				newStatus = "degraded_performance"
+	completed := 0
+	for i := range activeMaintenances {
+		maintenance := &activeMaintenances[i]
+		err := m.DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(maintenance).Update("status", models.MaintenanceCompleted).Error; err != nil {
+				return err
 			}
-		} else if err != gorm.ErrRecordNotFound {
-			log.Printf("Maintenance worker: Error checking incidents for component %d: %v", componentID, err)
+			maintenance.Status = models.MaintenanceCompleted
+			return LeaveMaintenance(tx, maintenance, maintenance.ComponentID)
+		})
+		if err != nil {
+			log.Printf("Maintenance worker: Error completing maintenance %d: %v", maintenance.ID, err)
 			continue
 		}
-
-		// Check if there are other active maintenances for this component
-		var otherMaintenance models.Maintenance
-		if err := tx.Where("id != ? AND component_id = ? AND status = ?",
-			maintenance.ID, componentID, models.MaintenanceInProgress).
-			First(&otherMaintenance).Error; err == nil {
-			// Another maintenance is still active
-			newStatus = "under_maintenance"
-		}
-
-		if err := tx.Model(&models.Component{}).Where("id = ?", componentID).
-			Update("status", newStatus).Error; err != nil {
-			log.Printf("Maintenance worker: Error updating component %d status: %v", componentID, err)
-		}
-
-		log.Printf("Maintenance %d (%s) completed - component status set to %s", maintenance.ID, maintenance.Name, newStatus)
+		completed++
+		log.Printf("Maintenance %d (%s) completed", maintenance.ID, maintenance.Name)
 	}
 
-	// Commit transaction
-	if err := tx.Commit().Error; err != nil {
-		log.Printf("Maintenance worker: Error committing transaction: %v", err)
-		return
-	}
-
-	if len(scheduledMaintenances) > 0 || len(activeMaintenances) > 0 {
-		log.Printf("Maintenance worker: Updated %d started, %d completed",
-			len(scheduledMaintenances), len(activeMaintenances))
+	if started > 0 || completed > 0 {
+		log.Printf("Maintenance worker: Updated %d started, %d completed", started, completed)
 	}
 }
