@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "openstatus.fullname" . }}-config
+  name: {{ include "vigie.fullname" . }}-config
   labels:
-    {{- include "openstatus.labels" . | nindent 4 }}
+    {{- include "vigie.labels" . | nindent 4 }}
 data:
-  DB_HOST: {{ include "openstatus.mysql.host" . | quote }}
+  DB_HOST: {{ include "vigie.mysql.host" . | quote }}
   DB_PORT: "3306"
   DB_NAME: {{ .Values.mysql.database | quote }}
   DB_USER: {{ .Values.mysql.user | quote }}

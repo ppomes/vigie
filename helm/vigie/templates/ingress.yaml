@@ -2,9 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "openstatus.fullname" . }}
+  name: {{ include "vigie.fullname" . }}
   labels:
-    {{- include "openstatus.labels" . | nindent 4 }}
+    {{- include "vigie.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -21,7 +21,7 @@ spec:
         {{- if .Values.ingress.hosts.api }}
         - {{ .Values.ingress.hosts.api }}
         {{- end }}
-      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "openstatus.fullname" .)) }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "vigie.fullname" .)) }}
   {{- end }}
   rules:
     # Frontend (public status page)
@@ -32,7 +32,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "openstatus.fullname" . }}-frontend
+                name: {{ include "vigie.fullname" . }}-frontend
                 port:
                   number: {{ .Values.frontend.service.port }}
     # Admin dashboard
@@ -43,7 +43,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "openstatus.fullname" . }}-admin
+                name: {{ include "vigie.fullname" . }}-admin
                 port:
                   number: {{ .Values.admin.service.port }}
     {{- if .Values.ingress.hosts.api }}
@@ -55,7 +55,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "openstatus.fullname" . }}-api
+                name: {{ include "vigie.fullname" . }}-api
                 port:
                   number: {{ .Values.api.service.port }}
     {{- end }}

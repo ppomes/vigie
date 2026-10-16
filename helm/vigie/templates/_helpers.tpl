@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "openstatus.name" -}}
+{{- define "vigie.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "openstatus.fullname" -}}
+{{- define "vigie.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,98 +24,98 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "openstatus.chart" -}}
+{{- define "vigie.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "openstatus.labels" -}}
-helm.sh/chart: {{ include "openstatus.chart" . }}
+{{- define "vigie.labels" -}}
+helm.sh/chart: {{ include "vigie.chart" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
 Selector labels for API
 */}}
-{{- define "openstatus.api.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "openstatus.name" . }}-api
+{{- define "vigie.api.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "vigie.name" . }}-api
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Selector labels for Frontend
 */}}
-{{- define "openstatus.frontend.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "openstatus.name" . }}-frontend
+{{- define "vigie.frontend.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "vigie.name" . }}-frontend
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Selector labels for Admin
 */}}
-{{- define "openstatus.admin.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "openstatus.name" . }}-admin
+{{- define "vigie.admin.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "vigie.name" . }}-admin
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Selector labels for MySQL
 */}}
-{{- define "openstatus.mysql.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "openstatus.name" . }}-mysql
+{{- define "vigie.mysql.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "vigie.name" . }}-mysql
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 MySQL host - depends on mode
 */}}
-{{- define "openstatus.mysql.host" -}}
+{{- define "vigie.mysql.host" -}}
 {{- if eq .Values.mysql.mode "moco" }}
 {{- printf "moco-%s-primary.%s.svc" .Values.mysql.moco.clusterName .Release.Namespace }}
 {{- else }}
-{{- printf "%s-mysql.%s.svc" (include "openstatus.fullname" .) .Release.Namespace }}
+{{- printf "%s-mysql.%s.svc" (include "vigie.fullname" .) .Release.Namespace }}
 {{- end }}
 {{- end }}
 
 {{/*
 Secret name for MySQL passwords
 */}}
-{{- define "openstatus.mysql.secretName" -}}
+{{- define "vigie.mysql.secretName" -}}
 {{- if .Values.mysql.existingSecret }}
 {{- .Values.mysql.existingSecret }}
 {{- else }}
-{{- printf "%s-mysql" (include "openstatus.fullname" .) }}
+{{- printf "%s-mysql" (include "vigie.fullname" .) }}
 {{- end }}
 {{- end }}
 
 {{/*
 Secret name for app config (JWT, etc.)
 */}}
-{{- define "openstatus.config.secretName" -}}
+{{- define "vigie.config.secretName" -}}
 {{- if .Values.config.existingSecret }}
 {{- .Values.config.existingSecret }}
 {{- else }}
-{{- printf "%s-config" (include "openstatus.fullname" .) }}
+{{- printf "%s-config" (include "vigie.fullname" .) }}
 {{- end }}
 {{- end }}
 
 {{/*
 Secret name for email config
 */}}
-{{- define "openstatus.email.secretName" -}}
+{{- define "vigie.email.secretName" -}}
 {{- if .Values.email.existingSecret }}
 {{- .Values.email.existingSecret }}
 {{- else }}
-{{- printf "%s-email" (include "openstatus.fullname" .) }}
+{{- printf "%s-email" (include "vigie.fullname" .) }}
 {{- end }}
 {{- end }}
 
 {{/*
 Image pull secrets
 */}}
-{{- define "openstatus.imagePullSecrets" -}}
+{{- define "vigie.imagePullSecrets" -}}
 {{- if .Values.global.imagePullSecrets }}
 imagePullSecrets:
 {{- range .Values.global.imagePullSecrets }}

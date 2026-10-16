@@ -1,13 +1,13 @@
 # Kubernetes Deployment
 
-This guide covers deploying OpenStatus on Kubernetes using the Helm chart.
+This guide covers deploying Vigie on Kubernetes using the Helm chart.
 
 ## Prerequisites
 
 - Kubernetes cluster (1.24+)
 - Helm 3.x
 - kubectl configured for your cluster
-- Container registry with OpenStatus images
+- Container registry with Vigie images
 
 ## Building and Pushing Images
 
@@ -15,7 +15,7 @@ First, build and push the images to your registry:
 
 ```bash
 # Set your registry
-REGISTRY=your-registry.com/openstatus
+REGISTRY=your-registry.com/vigie
 
 # Build and push images
 docker build -t $REGISTRY/api:latest ./api
@@ -40,13 +40,13 @@ config:
 # Image registry
 api:
   image:
-    repository: your-registry.com/openstatus/api
+    repository: your-registry.com/vigie/api
 frontend:
   image:
-    repository: your-registry.com/openstatus/frontend
+    repository: your-registry.com/vigie/frontend
 admin:
   image:
-    repository: your-registry.com/openstatus/admin
+    repository: your-registry.com/vigie/admin
 
 # MySQL passwords
 mysql:
@@ -68,7 +68,7 @@ EOF
 ### 2. Install
 
 ```bash
-helm install openstatus ./helm/openstatus -f my-values.yaml
+helm install vigie ./helm/vigie -f my-values.yaml
 ```
 
 ### 3. Verify
@@ -111,7 +111,7 @@ mysql:
   user: statuspage
   password: "secure-password"
   moco:
-    clusterName: openstatus-mysql
+    clusterName: vigie-mysql
     replicas: 1  # Single node
     version: "8.4"
     storageSize: 10Gi
@@ -148,7 +148,7 @@ ingress:
     cert-manager.io/cluster-issuer: letsencrypt-prod
   tls:
     enabled: true
-    secretName: openstatus-tls
+    secretName: vigie-tls
   hosts:
     frontend: status.example.com
     admin: admin.status.example.com
@@ -204,26 +204,26 @@ For production, create secrets manually and reference them:
 
 ```bash
 # Create secrets
-kubectl create secret generic openstatus-config \
+kubectl create secret generic vigie-config \
   --from-literal=jwt-secret-key=$(openssl rand -base64 32)
 
-kubectl create secret generic openstatus-mysql \
+kubectl create secret generic vigie-mysql \
   --from-literal=mysql-password=your-password \
   --from-literal=mysql-root-password=your-root-password
 
-kubectl create secret generic openstatus-email \
+kubectl create secret generic vigie-email \
   --from-literal=smtp-password=your-smtp-password
 ```
 
 ```yaml
 config:
-  existingSecret: openstatus-config
+  existingSecret: vigie-config
 
 mysql:
-  existingSecret: openstatus-mysql
+  existingSecret: vigie-mysql
 
 email:
-  existingSecret: openstatus-email
+  existingSecret: vigie-email
 ```
 
 ### Private Registry
@@ -263,16 +263,16 @@ frontend:
 ## Upgrading
 
 ```bash
-helm upgrade openstatus ./helm/openstatus -f my-values.yaml
+helm upgrade vigie ./helm/vigie -f my-values.yaml
 ```
 
 ## Uninstalling
 
 ```bash
-helm uninstall openstatus
+helm uninstall vigie
 
 # If you want to delete PVCs too (WARNING: deletes data!)
-kubectl delete pvc -l app.kubernetes.io/instance=openstatus
+kubectl delete pvc -l app.kubernetes.io/instance=vigie
 ```
 
 ## Troubleshooting
@@ -288,7 +288,7 @@ kubectl logs <pod-name>
 ### Check API health
 
 ```bash
-kubectl port-forward svc/openstatus-api 8080:8080
+kubectl port-forward svc/vigie-api 8080:8080
 curl http://localhost:8080/api/v1/status
 ```
 
@@ -307,5 +307,5 @@ nc -zv <mysql-host> 3306
 
 ```bash
 kubectl get mysqlcluster
-kubectl describe mysqlcluster openstatus-mysql
+kubectl describe mysqlcluster vigie-mysql
 ```
