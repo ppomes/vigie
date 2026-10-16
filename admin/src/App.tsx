@@ -1,6 +1,6 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, Fragment } from 'react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey } from './lib/api';
+import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey, IncidentUpdateInput } from './lib/api';
 
 // User context for role-based access
 interface UserContextType {
@@ -170,6 +170,99 @@ function ComponentStatusSelect({ value, onChange }: { value: string; onChange: (
   );
 }
 
+// Timeline of an incident: its updates, newest first, and a form to post one.
+// Posting sets the incident status and notifies subscribers.
+function IncidentTimeline({ incident, onChange }: { incident: Incident; onChange: () => void }) {
+  const { isAdmin } = useUser();
+  const [status, setStatus] = useState(incident.status);
+  const [messageEn, setMessageEn] = useState('');
+  const [messageFr, setMessageFr] = useState('');
+  const [componentStatus, setComponentStatus] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const message = (u: { translations?: { locale: string; field: string; value: string }[] }, locale: string) =>
+    u.translations?.find(t => t.field === 'message' && t.locale === locale)?.value;
+
+  const handlePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const translations: IncidentUpdateInput['translations'] = [];
+    if (messageEn.trim()) translations.push({ locale: 'en', field: 'message', value: messageEn });
+    if (messageFr.trim()) translations.push({ locale: 'fr', field: 'message', value: messageFr });
+    if (translations.length === 0) {
+      alert('Write a message in at least one language.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.createIncidentUpdate(incident.id, { status, translations, component_status: componentStatus || undefined });
+      setMessageEn('');
+      setMessageFr('');
+      setComponentStatus('');
+      onChange();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to post update');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (updateId: number) => {
+    if (!confirm('Delete this update? The incident status falls back to the previous update.')) return;
+    try {
+      await api.deleteIncidentUpdate(incident.id, updateId);
+      onChange();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete update');
+    }
+  };
+
+  return (
+    <div className="bg-gray-50 p-4">
+      <h4 className="font-medium mb-2">Timeline</h4>
+      {(incident.updates || []).length === 0 && <p className="text-sm text-gray-500 mb-2">No updates yet.</p>}
+      <ul className="space-y-2 mb-4">
+        {(incident.updates || []).map(u => (
+          <li key={u.id} className="bg-white border rounded p-2 text-sm">
+            <div className="flex justify-between">
+              <span>
+                <span className="font-medium">{u.status}</span>
+                <span className="text-gray-500 ml-2">{new Date(u.created_at).toLocaleString()}</span>
+                {u.user && <span className="text-gray-500 ml-2">by {u.user.username}</span>}
+              </span>
+              {isAdmin && <button onClick={() => handleDelete(u.id)} className="text-red-500">Delete</button>}
+            </div>
+            {message(u, 'en') && <p><span className="text-gray-500">EN:</span> {message(u, 'en')}</p>}
+            {message(u, 'fr') && <p><span className="text-gray-500">FR:</span> {message(u, 'fr')}</p>}
+          </li>
+        ))}
+      </ul>
+      {isAdmin && (
+        <form onSubmit={handlePost} className="space-y-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">New status</label>
+              <select value={status} onChange={e => setStatus(e.target.value)} className="w-full border rounded px-3 py-2">
+                <option value="investigating">Investigating</option>
+                <option value="identified">Identified</option>
+                <option value="monitoring">Monitoring</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </div>
+            <ComponentStatusSelect value={componentStatus} onChange={setComponentStatus} />
+            <textarea placeholder="Message (English)" value={messageEn} onChange={e => setMessageEn(e.target.value)}
+              className="border rounded px-3 py-2" rows={2} />
+            <textarea placeholder="Message (French)" value={messageFr} onChange={e => setMessageFr(e.target.value)}
+              className="border rounded px-3 py-2" rows={2} />
+          </div>
+          <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50">
+            Post update
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
@@ -178,6 +271,7 @@ function IncidentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<IncidentForm>(defaultIncidentForm);
+  const [openTimeline, setOpenTimeline] = useState<number | null>(null);
 
   // Template mode state
   const [mode, setMode] = useState<'freeform' | 'template'>('freeform');
@@ -532,16 +626,28 @@ function IncidentsPage() {
         </thead>
         <tbody>
           {incidents.map(i => (
-            <tr key={i.id}>
-              <td className="border p-2">{i.name}</td>
-              <td className="border p-2">{i.status}</td>
-              <td className="border p-2">{components.find(c => c.id === i.component_id)?.name || '-'}</td>
-              <td className="border p-2">{new Date(i.created_at).toLocaleDateString()}</td>
-              <td className="border p-2">
-                <button onClick={() => handleEdit(i)} className="text-blue-500 mr-2">Edit</button>
-                <button onClick={() => handleDelete(i.id)} className="text-red-500">Delete</button>
-              </td>
-            </tr>
+            <Fragment key={i.id}>
+              <tr>
+                <td className="border p-2">{i.name}</td>
+                <td className="border p-2">{i.status}</td>
+                <td className="border p-2">{components.find(c => c.id === i.component_id)?.name || '-'}</td>
+                <td className="border p-2">{new Date(i.created_at).toLocaleDateString()}</td>
+                <td className="border p-2">
+                  <button onClick={() => setOpenTimeline(openTimeline === i.id ? null : i.id)} className="text-gray-700 mr-2">
+                    Updates ({i.updates?.length || 0})
+                  </button>
+                  <button onClick={() => handleEdit(i)} className="text-blue-500 mr-2">Edit</button>
+                  <button onClick={() => handleDelete(i.id)} className="text-red-500">Delete</button>
+                </td>
+              </tr>
+              {openTimeline === i.id && (
+                <tr>
+                  <td colSpan={5} className="border p-0">
+                    <IncidentTimeline incident={i} onChange={loadIncidents} />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>

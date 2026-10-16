@@ -15,3 +15,8 @@ type Translation struct {
 	Value      string         `gorm:"type:text" json:"value"`
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
+
+// TranslationEntityTypes lists the entity types that may own translations.
+// The MySQL schema enforces it with the chk_translation_entity constraint,
+// which database.EnsureSchema keeps in sync.
+var TranslationEntityTypes = []string{"component", "incident", "maintenance", "incident_update"}

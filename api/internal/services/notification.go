@@ -63,6 +63,21 @@ func (n *NotificationService) StopWorker() {
 // QueueIncidentNotifications queues notifications for all confirmed subscribers
 // Returns immediately - notifications are processed asynchronously
 func (n *NotificationService) QueueIncidentNotifications(incident *models.Incident, eventType string) (int, error) {
+	return n.queueIncident(incident, nil, eventType)
+}
+
+// QueueIncidentUpdateNotifications queues notifications for a new update in an
+// incident's timeline. The email carries the update status and message.
+func (n *NotificationService) QueueIncidentUpdateNotifications(incident *models.Incident, update *models.IncidentUpdate) (int, error) {
+	if err := n.DB.Preload("Translations").First(update, update.ID).Error; err != nil {
+		return 0, fmt.Errorf("failed to load incident update: %w", err)
+	}
+	return n.queueIncident(incident, update, "update")
+}
+
+// queueIncident queues one notification per confirmed subscriber. When update
+// is set, its status and message replace the incident's.
+func (n *NotificationService) queueIncident(incident *models.Incident, update *models.IncidentUpdate, eventType string) (int, error) {
 	// Get all confirmed subscribers
 	var subscribers []models.Subscriber
 	if err := n.DB.Where("confirmed = ?", true).Find(&subscribers).Error; err != nil {
@@ -92,13 +107,18 @@ func (n *NotificationService) QueueIncidentNotifications(incident *models.Incide
 		// Get localized content
 		incidentName := n.getTranslationWithFallback(incident.Translations, "name", locale, incident.Name)
 		incidentMessage := n.getTranslationWithFallback(incident.Translations, "message", locale, "")
+		status := incident.Status
+		if update != nil {
+			incidentMessage = n.getTranslationWithFallback(update.Translations, "message", locale, "")
+			status = update.Status
+		}
 		if incidentMessage == "" {
 			incidentMessage = "No additional details provided."
 		}
 
 		// Build email subject and body
-		subject := fmt.Sprintf("[%s] %s", incident.Status, incidentName)
-		body := n.buildEmailBody(incidentName, incident.Status, incidentMessage, subscriber.UnsubscribeToken)
+		subject := fmt.Sprintf("[%s] %s", status, incidentName)
+		body := n.buildEmailBody(incidentName, status, incidentMessage, subscriber.UnsubscribeToken)
 
 		notification := models.NotificationQueue{
 			IncidentID:   incident.ID,

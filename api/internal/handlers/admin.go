@@ -493,6 +493,13 @@ func DeleteIncident(db *gorm.DB) gin.HandlerFunc {
 		// Start transaction
 		tx := db.Begin()
 
+		// Remove the timeline with the incident
+		if err := deleteIncidentUpdates(tx, incident.ID); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete incident updates"})
+			return
+		}
+
 		// Soft delete (DeletedAt will be set)
 		if err := tx.Delete(&incident).Error; err != nil {
 			tx.Rollback()
@@ -517,7 +524,9 @@ func DeleteIncident(db *gorm.DB) gin.HandlerFunc {
 func ListIncidents(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var incidents []models.Incident
-		if err := db.Preload("Translations").Preload("Component").Order("created_at DESC").Find(&incidents).Error; err != nil {
+		if err := db.Preload("Translations").Preload("Component").
+			Preload("Updates", updatesNewestFirst).Preload("Updates.Translations").Preload("Updates.User").
+			Order("created_at DESC").Find(&incidents).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch incidents"})
 			return
 		}

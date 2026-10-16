@@ -47,8 +47,14 @@ func main() {
 		&models.MaintenanceTemplate{},
 		&models.AuditLog{},
 		&models.APIKey{},
+		&models.IncidentUpdate{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	// Schema changes AutoMigrate cannot make
+	if err := database.EnsureSchema(db); err != nil {
+		log.Fatalf("Failed to update database schema: %v", err)
 	}
 
 	// Initialize audit service
@@ -148,6 +154,9 @@ func main() {
 			adminOnly.POST("/incidents", handlers.CreateIncident(db, notificationService))
 			adminOnly.PUT("/incidents/:id", handlers.UpdateIncident(db, notificationService))
 			adminOnly.DELETE("/incidents/:id", handlers.DeleteIncident(db))
+			adminOnly.POST("/incidents/:id/updates", handlers.CreateIncidentUpdate(db, notificationService))
+			adminOnly.PUT("/incidents/:id/updates/:update_id", handlers.UpdateIncidentUpdate(db))
+			adminOnly.DELETE("/incidents/:id/updates/:update_id", handlers.DeleteIncidentUpdate(db))
 
 			// Subscriber management
 			adminOnly.DELETE("/subscribers/:id", handlers.DeleteSubscriber(db))

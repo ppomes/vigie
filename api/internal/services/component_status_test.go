@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -193,5 +194,29 @@ func TestWorkerFailureDoesNotBlockOtherMaintenances(t *testing.T) {
 	}
 	if s := testutil.ComponentStatus(t, db, c.ID); s != ComponentUnderMaintenance {
 		t.Fatalf("component: got %q, want %q", s, ComponentUnderMaintenance)
+	}
+}
+
+func TestIncidentUpdateNotificationUsesUpdateMessage(t *testing.T) {
+	db := testutil.NewDB(t)
+	c := testutil.CreateComponent(t, db, "API", ComponentOperational)
+	incident := models.Incident{Name: "Slow API", Status: "monitoring", ComponentID: c.ID}
+	if err := db.Create(&incident).Error; err != nil {
+		t.Fatal(err)
+	}
+	update := models.IncidentUpdate{IncidentID: incident.ID, Status: "monitoring"}
+	db.Create(&update)
+	db.Create(&models.Translation{EntityID: update.ID, EntityType: "incident_update", Locale: "fr", Field: "message", Value: "Correctif déployé"})
+	db.Create(&models.Subscriber{Email: "fr@example.com", Locale: "fr", Confirmed: true, UnsubscribeToken: "u1"})
+
+	n := NewNotificationService(db, nil)
+	queued, err := n.QueueIncidentUpdateNotifications(&incident, &update)
+	if err != nil || queued != 1 {
+		t.Fatalf("queued %d, err %v", queued, err)
+	}
+	var q models.NotificationQueue
+	db.First(&q)
+	if q.Subject != "[monitoring] Slow API" || !strings.Contains(q.Body, "Correctif déployé") {
+		t.Fatalf("subject %q, body %q", q.Subject, q.Body)
 	}
 }
