@@ -44,7 +44,8 @@
     "subscribe": "S'abonner",
     "subscribing": "Inscription...",
     "success": "Inscrit ! Veuillez vérifier votre email pour confirmer.",
-    "error": "Échec de l'inscription. Veuillez réessayer."
+    "error": "Échec de l'inscription. Veuillez réessayer.",
+    "onlySome": "Seulement certains composants"
   },
   "common": {
     "loading": "Chargement...",
@@ -53,5 +54,14 @@
   },
   "language": {
     "switchTo": "Langue"
+  },
+  "manage": {
+    "title": "Vos notifications",
+    "all": "Tous les composants",
+    "some": "Seulement ces composants",
+    "save": "Enregistrer",
+    "saved": "Votre choix est enregistré.",
+    "error": "Ce lien n'est plus valide.",
+    "back": "Retour à la page de statut"
   }
 }

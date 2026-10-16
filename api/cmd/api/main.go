@@ -52,6 +52,7 @@ func main() {
 		&models.Tag{},
 		&models.IncidentComponent{},
 		&models.MaintenanceComponent{},
+		&models.Subscription{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -111,6 +112,8 @@ func main() {
 		public.POST("/subscribe", middleware.SubscribeLimiter.Middleware(), handlers.Subscribe(db, emailService))
 		public.GET("/confirm", handlers.Confirm(db))
 		public.GET("/unsubscribe", handlers.Unsubscribe(db))
+		public.GET("/subscriptions", handlers.GetSubscription(db))
+		public.PUT("/subscriptions", handlers.UpdateSubscription(db))
 
 		// Settings endpoints (public)
 		public.GET("/settings/theme", handlers.GetTheme(db))

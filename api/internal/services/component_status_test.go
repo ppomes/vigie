@@ -257,3 +257,55 @@ func TestStatusSetBetweenOverlappingMaintenancesIsRestored(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationsReachOnlyFollowers(t *testing.T) {
+	db := testutil.NewDB(t)
+	api := testutil.CreateComponent(t, db, "API", ComponentOperational)
+	web := testutil.CreateComponent(t, db, "Website", ComponentOperational)
+
+	global := models.Subscriber{Email: "all@example.com", Confirmed: true, Global: true, UnsubscribeToken: "g"}
+	apiFan := models.Subscriber{Email: "api@example.com", Confirmed: true, UnsubscribeToken: "a"}
+	webFan := models.Subscriber{Email: "web@example.com", Confirmed: true, UnsubscribeToken: "w"}
+	for _, s := range []*models.Subscriber{&global, &apiFan, &webFan} {
+		db.Create(s)
+	}
+	// Global defaults to true: make the followers explicit.
+	db.Model(&apiFan).Update("global", false)
+	db.Model(&webFan).Update("global", false)
+	db.Create(&models.Subscription{SubscriberID: apiFan.ID, ComponentID: api.ID})
+	db.Create(&models.Subscription{SubscriberID: webFan.ID, ComponentID: web.ID})
+
+	incident := models.Incident{Name: "API slow", Status: "investigating", ComponentID: api.ID}
+	db.Create(&incident)
+	db.Create(&models.IncidentComponent{IncidentID: incident.ID, ComponentID: api.ID})
+
+	t.Setenv("PUBLIC_URL", "https://status.example.com")
+	t.Setenv("API_URL", "https://api.example.com")
+	n := NewNotificationService(db, nil)
+	if _, err := n.QueueIncidentNotifications(&incident, "created"); err != nil {
+		t.Fatal(err)
+	}
+
+	var queued []models.NotificationQueue
+	db.Order("email").Find(&queued)
+	var emails []string
+	for _, q := range queued {
+		emails = append(emails, q.Email)
+	}
+	if strings.Join(emails, ",") != "all@example.com,api@example.com" {
+		t.Fatalf("notified %v, want the global subscriber and the API follower", emails)
+	}
+
+	body := queued[0].Body
+	for _, want := range []string{
+		"https://status.example.com/?manage=",
+		"https://api.example.com/api/v1/unsubscribe?token=",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("email body lacks %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "{{") {
+		t.Errorf("email body has an unreplaced placeholder:\n%s", body)
+	}
+}
