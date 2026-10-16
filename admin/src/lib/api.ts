@@ -59,6 +59,17 @@ export interface User {
   created_at: string;
 }
 
+export interface APIKey {
+  id: number;
+  name: string;
+  prefix: string;
+  user_id: number;
+  user?: User;
+  last_used_at?: string;
+  revoked_at?: string;
+  created_at: string;
+}
+
 export interface AuditLog {
   id: number;
   user_id?: number;
@@ -281,6 +292,13 @@ export const api = {
     fetchAPI<{ message: string }>(`/admin/users/${id}`, { method: 'DELETE' }),
   resetUserPassword: (id: number, password: string) =>
     fetchAPI<{ message: string }>(`/admin/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ password }) }),
+
+  // API keys (admin only). The raw key is only returned on creation.
+  getAPIKeys: () => fetchAPI<{ api_keys: APIKey[] }>('/admin/api-keys').then(r => r.api_keys || []),
+  createAPIKey: (data: { name: string; user_id?: number }) =>
+    fetchAPI<{ api_key: APIKey; key: string }>('/admin/api-keys', { method: 'POST', body: JSON.stringify(data) }),
+  revokeAPIKey: (id: number) =>
+    fetchAPI<{ message: string }>(`/admin/api-keys/${id}`, { method: 'DELETE' }),
 
   // Audit logs (admin only)
   getAuditLogs: (params?: { user_id?: number; action?: string; resource?: string; from?: string; to?: string; page?: number; limit?: number }) => {

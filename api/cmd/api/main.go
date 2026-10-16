@@ -46,6 +46,7 @@ func main() {
 		&models.Maintenance{},
 		&models.MaintenanceTemplate{},
 		&models.AuditLog{},
+		&models.APIKey{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -118,7 +119,7 @@ func main() {
 	{
 		// Self-service endpoints (any authenticated user)
 		admin.GET("/me", handlers.GetCurrentUserProfile(db))
-		admin.PUT("/me/password", handlers.ChangeOwnPassword(db, auditService))
+		admin.PUT("/me/password", middleware.RequireSession(), handlers.ChangeOwnPassword(db, auditService))
 
 		// Read-only routes (viewers and admins can access)
 		admin.GET("/components", handlers.ListComponents(db))
@@ -181,13 +182,22 @@ func main() {
 			adminOnly.DELETE("/maintenance-templates/:id", handlers.DeleteMaintenanceTemplate(db))
 			adminOnly.POST("/maintenance-templates/:id/preview", handlers.PreviewMaintenanceTemplate(db))
 
-			// User management (admin only)
+			// User management (admin only). Changes need an interactive
+			// session, so a leaked API key cannot create accounts or reset
+			// passwords.
 			adminOnly.GET("/users", handlers.ListUsers(db, auditService))
 			adminOnly.GET("/users/:id", handlers.GetUser(db, auditService))
-			adminOnly.POST("/users", handlers.CreateUser(db, auditService))
-			adminOnly.PUT("/users/:id", handlers.UpdateUser(db, auditService))
-			adminOnly.DELETE("/users/:id", handlers.DeleteUser(db, auditService))
-			adminOnly.PUT("/users/:id/password", handlers.ResetUserPassword(db, auditService))
+			adminOnly.POST("/users", middleware.RequireSession(), handlers.CreateUser(db, auditService))
+			adminOnly.PUT("/users/:id", middleware.RequireSession(), handlers.UpdateUser(db, auditService))
+			adminOnly.DELETE("/users/:id", middleware.RequireSession(), handlers.DeleteUser(db, auditService))
+			adminOnly.PUT("/users/:id/password", middleware.RequireSession(), handlers.ResetUserPassword(db, auditService))
+
+			// API keys (admin only, and only from an interactive session:
+			// an API key cannot create or revoke keys)
+			apiKeys := adminOnly.Group("/api-keys", middleware.RequireSession())
+			apiKeys.GET("", handlers.ListAPIKeys(db))
+			apiKeys.POST("", handlers.CreateAPIKey(db, auditService))
+			apiKeys.DELETE("/:id", handlers.RevokeAPIKey(db, auditService))
 
 			// Audit logs (admin only)
 			adminOnly.GET("/audit", handlers.ListAuditLogs(auditService))
