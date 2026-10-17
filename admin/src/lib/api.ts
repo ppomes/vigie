@@ -232,6 +232,11 @@ export interface BrandingConfig {
   logo: string;
 }
 
+export interface LanguageSetting {
+  default: string;
+  mode: 'fixed' | 'browser';
+}
+
 export interface Customization {
   css: string;
   header_html: string;
@@ -333,6 +338,9 @@ export const api = {
 
   // Branding settings
   getBranding: () => fetchAPI<BrandingConfig>('/settings/branding'),
+  getLanguageSetting: () => fetchAPI<LanguageSetting>('/settings/language'),
+  updateLanguageSetting: (s: LanguageSetting) =>
+    fetchAPI<LanguageSetting>('/admin/settings/language', { method: 'PUT', body: JSON.stringify(s) }),
   getCustomization: () => fetchAPI<Customization>('/settings/customization'),
   updateCustomization: (c: Customization) =>
     fetchAPI<Customization>('/admin/settings/customization', { method: 'PUT', body: JSON.stringify(c) }),
