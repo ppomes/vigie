@@ -44,7 +44,8 @@
     "subscribe": "Subscribe",
     "subscribing": "Subscribing...",
     "success": "Subscribed! Please check your email to confirm.",
-    "error": "Failed to subscribe. Please try again."
+    "error": "Failed to subscribe. Please try again.",
+    "onlySome": "Only some components"
   },
   "common": {
     "loading": "Loading...",
@@ -53,5 +54,15 @@
   },
   "language": {
     "switchTo": "Language"
+  },
+  "manage": {
+    "title": "Your notifications",
+    "all": "Every component",
+    "some": "Only these components",
+    "save": "Save",
+    "saved": "Your choice is saved.",
+    "error": "This link is not valid any more.",
+    "saveError": "Your choice could not be saved. Please try again.",
+    "back": "Back to the status page"
   }
 }

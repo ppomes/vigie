@@ -62,8 +62,11 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
 
-      # API URL for email links
-      API_URL: ${API_URL:-http://localhost:3000}
+      # Public addresses used in email links: where readers reach the API
+      # (confirmation and unsubscribe links), and the public status page
+      # (where they choose the components they follow)
+      API_URL: ${API_URL:-http://localhost:8080}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
     ports:
       - "${API_PORT:-8080}:8080"
     networks:

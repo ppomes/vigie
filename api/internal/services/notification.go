@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net/url"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,10 +81,14 @@ func (n *NotificationService) QueueIncidentUpdateNotifications(incident *models.
 // queueIncident queues one notification per confirmed subscriber. When update
 // is set, its status and message replace the incident's.
 func (n *NotificationService) queueIncident(incident *models.Incident, update *models.IncidentUpdate, eventType string) (int, error) {
-	// Get all confirmed subscribers
-	var subscribers []models.Subscriber
-	if err := n.DB.Where("confirmed = ?", true).Find(&subscribers).Error; err != nil {
-		return 0, fmt.Errorf("failed to fetch subscribers: %w", err)
+	// Confirmed subscribers who follow one of the affected components
+	componentIDs, err := n.affectedComponentIDs(&models.IncidentComponent{}, "incident_id", incident.ID, incident.ComponentID)
+	if err != nil {
+		return 0, err
+	}
+	subscribers, err := n.subscribersFor(componentIDs)
+	if err != nil {
+		return 0, err
 	}
 
 	if len(subscribers) == 0 {
@@ -143,6 +150,59 @@ func (n *NotificationService) queueIncident(incident *models.Incident, update *m
 	return queued, nil
 }
 
+// affectedComponentIDs reads the components of an incident or maintenance
+// from its join table (model, keyed by column), falling back to its main
+// component.
+func (n *NotificationService) affectedComponentIDs(model any, column string, id, mainComponentID uint) ([]uint, error) {
+	var ids []uint
+	if err := n.DB.Model(model).Where(column+" = ?", id).Pluck("component_id", &ids).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch affected components: %w", err)
+	}
+	if len(ids) == 0 && mainComponentID != 0 {
+		ids = []uint{mainComponentID}
+	}
+	return ids, nil
+}
+
+// subscribersFor returns the confirmed subscribers who follow at least one
+// of the components: global subscribers, and those subscribed to one of them.
+func (n *NotificationService) subscribersFor(componentIDs []uint) ([]models.Subscriber, error) {
+	q := n.DB.Where("confirmed = ?", true)
+	if len(componentIDs) > 0 {
+		followers := n.DB.Model(&models.Subscription{}).Select("subscriber_id").Where("component_id IN ?", componentIDs)
+		q = q.Where("global = ? OR id IN (?)", true, followers)
+	} else {
+		q = q.Where("global = ?", true)
+	}
+	var subscribers []models.Subscriber
+	if err := q.Find(&subscribers).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch subscribers: %w", err)
+	}
+	return subscribers, nil
+}
+
+// subscriptionFooter ends every notification with links to choose the
+// components to follow, on the public page, and to unsubscribe, on the API.
+// PUBLIC_URL is the public status page; API_URL is where readers reach the
+// API, as for confirmation emails.
+func subscriptionFooter(unsubscribeToken string) string {
+	publicURL := strings.TrimRight(os.Getenv("PUBLIC_URL"), "/")
+	if publicURL == "" {
+		publicURL = "http://localhost:3000"
+	}
+	apiURL := strings.TrimRight(os.Getenv("API_URL"), "/")
+	if apiURL == "" {
+		apiURL = "http://localhost:8080"
+	}
+	token := url.QueryEscape(unsubscribeToken)
+	return fmt.Sprintf(`---
+To choose which components you hear about:
+%s/?manage=%s
+
+To unsubscribe from these notifications:
+%s/api/v1/unsubscribe?token=%s`, publicURL, token, apiURL, token)
+}
+
 // buildEmailBody creates the email body content
 func (n *NotificationService) buildEmailBody(name, status, message, unsubscribeToken string) string {
 	return fmt.Sprintf(`Incident: %s
@@ -150,10 +210,8 @@ Status: %s
 
 %s
 
----
-To unsubscribe from these notifications, click here:
-%s/unsubscribe?token=%s`,
-		name, status, message, "{{BASE_URL}}", unsubscribeToken)
+%s`,
+		name, status, message, subscriptionFooter(unsubscribeToken))
 }
 
 // processQueue is the main worker loop that processes pending notifications
@@ -351,10 +409,14 @@ func (n *NotificationService) NotifyMaintenanceUpdated(maintenance *models.Maint
 
 // QueueMaintenanceNotifications queues notifications for all confirmed subscribers about a maintenance
 func (n *NotificationService) QueueMaintenanceNotifications(maintenance *models.Maintenance, eventType string) (int, error) {
-	// Get all confirmed subscribers
-	var subscribers []models.Subscriber
-	if err := n.DB.Where("confirmed = ?", true).Find(&subscribers).Error; err != nil {
-		return 0, fmt.Errorf("failed to fetch subscribers: %w", err)
+	// Confirmed subscribers who follow one of the covered components
+	componentIDs, err := n.affectedComponentIDs(&models.MaintenanceComponent{}, "maintenance_id", maintenance.ID, maintenance.ComponentID)
+	if err != nil {
+		return 0, err
+	}
+	subscribers, err := n.subscribersFor(componentIDs)
+	if err != nil {
+		return 0, err
 	}
 
 	if len(subscribers) == 0 {
@@ -427,13 +489,11 @@ Status: %s
 Start: %s
 End: %s
 
----
-To unsubscribe from these notifications, click here:
-%s/unsubscribe?token=%s`,
+%s`,
 		name, status, message,
 		startAt.Format("2006-01-02 15:04 MST"),
 		endAt.Format("2006-01-02 15:04 MST"),
-		"{{BASE_URL}}", unsubscribeToken)
+		subscriptionFooter(unsubscribeToken))
 }
 
 // getTranslation retrieves a translation value for a specific field and locale

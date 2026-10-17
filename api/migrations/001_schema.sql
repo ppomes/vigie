@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS subscribers (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     confirmed BOOLEAN DEFAULT FALSE,
+    global BOOLEAN NOT NULL DEFAULT TRUE,
     confirmation_token VARCHAR(255),
     unsubscribe_token VARCHAR(255) UNIQUE,
     locale VARCHAR(5) NOT NULL DEFAULT 'en',
@@ -276,6 +277,19 @@ CREATE TABLE IF NOT EXISTS maintenance_components (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY idx_maintenance_component (maintenance_id, component_id),
     INDEX idx_maintenance_components_component_id (component_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- SUBSCRIPTIONS
+-- =============================================================================
+-- Components a non-global subscriber follows.
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    subscriber_id BIGINT UNSIGNED NOT NULL,
+    component_id BIGINT UNSIGNED NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY idx_subscription (subscriber_id, component_id),
+    INDEX idx_subscriptions_component_id (component_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================

@@ -209,6 +209,14 @@ config:
   # -- Gin mode: debug or release
   ginMode: release
 
+  # -- Address readers use to reach the API, in email links (confirm,
+  # unsubscribe). Defaults to the API ingress host.
+  apiUrl: ""
+
+  # -- Address of the public status page, in email links (choosing the
+  # components to follow). Defaults to the frontend ingress host.
+  publicUrl: ""
+
 # =============================================================================
 # Email Configuration
 # =============================================================================

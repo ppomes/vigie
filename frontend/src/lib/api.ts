@@ -105,10 +105,29 @@ export async function getStatus(): Promise<SystemStatus> {
   return fetchAPI<SystemStatus>('/status');
 }
 
-export async function subscribe(email: string, locale: string = 'en'): Promise<{ message: string }> {
+// componentIds limits notifications to these components; empty means all.
+export async function subscribe(email: string, locale: string = 'en', componentIds: number[] = []): Promise<{ message: string }> {
   return fetchAPI<{ message: string }>('/subscribe', {
     method: 'POST',
-    body: JSON.stringify({ email, locale }),
+    body: JSON.stringify({ email, locale, component_ids: componentIds }),
+  });
+}
+
+// What a subscriber follows, reached with the token from their emails.
+export interface SubscriptionChoice {
+  email?: string;
+  global: boolean;
+  component_ids: number[];
+}
+
+export async function getSubscription(token: string): Promise<SubscriptionChoice> {
+  return fetchAPI<SubscriptionChoice>(`/subscriptions?token=${encodeURIComponent(token)}`);
+}
+
+export async function updateSubscription(token: string, choice: SubscriptionChoice): Promise<SubscriptionChoice> {
+  return fetchAPI<SubscriptionChoice>(`/subscriptions?token=${encodeURIComponent(token)}`, {
+    method: 'PUT',
+    body: JSON.stringify(choice),
   });
 }
 

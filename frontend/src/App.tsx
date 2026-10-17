@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getComponents, getComponentGroups, getIncidents, getMaintenances, getStatus, subscribe, Component, ComponentGroup, Incident, Maintenance, SystemStatus } from './lib/api';
+import { getComponents, getComponentGroups, getIncidents, getMaintenances, getStatus, subscribe, getSubscription, updateSubscription, Component, ComponentGroup, Incident, Maintenance, SystemStatus } from './lib/api';
 import { useTheme } from './themes/ThemeContext';
 import { useBranding } from './themes/BrandingContext';
 
@@ -339,9 +339,95 @@ function MaintenancesList() {
   );
 }
 
+// Checkboxes to pick components; an empty choice means every component.
+function ComponentChoice({ value, onChange }: { value: number[]; onChange: (ids: number[]) => void }) {
+  const { i18n } = useTranslation();
+  const [components, setComponents] = useState<Component[]>([]);
+  useEffect(() => {
+    getComponents(i18n.language).then(setComponents).catch(() => setComponents([]));
+  }, [i18n.language]);
+  const toggle = (id: number) => onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+  return (
+    <div className="flex flex-wrap gap-3">
+      {components.map(c => (
+        <label key={c.id} className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={value.includes(c.id)} onChange={() => toggle(c.id)} />
+          {c.name}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function ManageBackLink() {
+  const { t } = useTranslation();
+  return <a href={window.location.pathname} className="text-sm hover:underline">← {t('manage.back')}</a>;
+}
+
+// Reached from the link in each notification email (?manage=<token>).
+function ManageSubscription({ token }: { token: string }) {
+  const { t } = useTranslation();
+  const [email, setEmail] = useState('');
+  const [all, setAll] = useState(true);
+  const [ids, setIds] = useState<number[]>([]);
+  const [state, setState] = useState<'loading' | 'ready' | 'saved' | 'error'>('loading');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    getSubscription(token)
+      .then(choice => {
+        setEmail(choice.email || '');
+        setAll(choice.global);
+        setIds(choice.component_ids || []);
+        setState('ready');
+      })
+      .catch(() => {
+        setState('error');
+        setMessage(t('manage.error'));
+      });
+  }, [token]);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateSubscription(token, { global: all, component_ids: all ? [] : ids });
+      setState('saved');
+      setMessage(t('manage.saved'));
+    } catch {
+      setState('ready');
+      setMessage(t('manage.saveError'));
+    }
+  };
+
+  if (state === 'loading') return <p className="text-muted">{t('common.loading')}</p>;
+  if (state === 'error') return <p className="text-red-600">{message}</p>;
+
+  return (
+    <form onSubmit={save} className="card p-6 space-y-4">
+      <h2 className="text-xl font-bold">{t('manage.title')}</h2>
+      <p className="text-sm text-muted">{email}</p>
+      <label className="flex items-center gap-2">
+        <input type="radio" checked={all} onChange={() => setAll(true)} />
+        {t('manage.all')}
+      </label>
+      <label className="flex items-center gap-2">
+        <input type="radio" checked={!all} onChange={() => setAll(false)} />
+        {t('manage.some')}
+      </label>
+      {!all && <ComponentChoice value={ids} onChange={setIds} />}
+      <button type="submit" disabled={!all && ids.length === 0} className="px-6 py-2 btn-primary rounded-lg disabled:opacity-50">
+        {t('manage.save')}
+      </button>
+      {message && <p className={state === 'saved' ? 'text-green-600' : 'text-red-600'}>{message}</p>}
+    </form>
+  );
+}
+
 function SubscriptionForm() {
   const { t, i18n } = useTranslation();
   const [email, setEmail] = useState('');
+  const [onlySome, setOnlySome] = useState(false);
+  const [componentIds, setComponentIds] = useState<number[]>([]);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
 
@@ -350,7 +436,7 @@ function SubscriptionForm() {
     setStatus('loading');
     try {
       // Subscribe with current language preference
-      const result = await subscribe(email, i18n.language);
+      const result = await subscribe(email, i18n.language, onlySome ? componentIds : []);
       setStatus('success');
       setMessage(result.message || t('subscription.success'));
       setEmail('');
@@ -384,6 +470,11 @@ function SubscriptionForm() {
           {status === 'loading' ? t('subscription.subscribing') : t('subscription.subscribe')}
         </button>
       </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={onlySome} onChange={e => setOnlySome(e.target.checked)} />
+        {t('subscription.onlySome')}
+      </label>
+      {onlySome && <ComponentChoice value={componentIds} onChange={setComponentIds} />}
       {message && (
         <p className={status === 'success' ? 'text-green-600' : 'text-red-600'}>{message}</p>
       )}
@@ -552,11 +643,24 @@ function FullWidthLayout() {
 
 export default function App() {
   const { theme, loading } = useTheme();
+  const manageToken = new URLSearchParams(window.location.search).get('manage');
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  if (manageToken) {
+    return (
+      <div className="min-h-screen p-4">
+        <div className="max-w-xl mx-auto space-y-4">
+          <div className="flex justify-end"><LanguageSwitcher /></div>
+          <ManageSubscription token={manageToken} />
+          <ManageBackLink />
+        </div>
       </div>
     );
   }
