@@ -339,6 +339,27 @@ GET /settings/branding
 
 ---
 
+#### Get Customization
+
+Returns the custom CSS, header and footer of the status page. The HTML is
+sanitized.
+
+```
+GET /settings/customization
+```
+
+**Response:**
+
+```json
+{
+  "css": ".card { border-radius: 0; }",
+  "header_html": "<a href=\"https://example.com\">Back to example.com</a>",
+  "footer_html": "<p>© Example</p>"
+}
+```
+
+---
+
 ## Admin Endpoints
 
 All admin endpoints require authentication via JWT token.
@@ -1080,6 +1101,22 @@ PUT /admin/settings/:key
   "value": "dark"
 }
 ```
+
+#### Update Customization
+
+**Admin only**
+
+```
+PUT /admin/settings/customization
+```
+
+Takes the same fields as [Get Customization](#get-customization) and returns
+what was saved. The CSS is added after the theme's styles, so its rules win;
+the theme's colours are CSS variables on `:root`, such as
+`--color-operational`. The HTML is sanitized: links, images (including data
+URLs), text formatting, tables and a set of inline styles are kept; scripts,
+event handlers, forms, frames, `<style>` and `url()` in styles are removed.
+Limits: 100 KB of CSS, 50 KB for each of header and footer.
 
 #### Update Branding
 

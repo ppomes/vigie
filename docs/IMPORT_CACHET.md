@@ -51,6 +51,14 @@ fresh installation are removed.
 | users | users, matched by username or email. Passwords keep working |
 | user API keys | API keys, stored hashed. Integrations keep working |
 | `app_name` | the page title |
+| `app_banner` | the logo, if it is under 500 KB |
+| `stylesheet`, `style_*` colours | the custom CSS: colours become the theme's CSS variables, the stylesheet follows |
+| `header`, `footer` | the custom header and footer, sanitized (no scripts, event handlers, forms or frames) |
+
+Cachet's stylesheet was written for Cachet's page, whose HTML is not Vigie's:
+its selectors may match nothing. Check it under Settings, Customization. The
+`style_greys`, `style_metrics`, banner padding and full-width header settings
+have no equivalent.
 
 Ids are kept so that monitoring scripts, which address components by id,
 keep working, through the Cachet compatible API.
