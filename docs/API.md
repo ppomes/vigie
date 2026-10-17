@@ -55,6 +55,7 @@ The following endpoints are rate-limited per IP address:
 | Endpoint | Limit | Window |
 |----------|-------|--------|
 | `POST /admin/login` | 10 requests | 15 minutes |
+| Wrong two-factor codes, per user (any IP) | 5 | 15 minutes |
 | `POST /forgot-password` | 3 requests | 1 hour |
 | `POST /reset-password` | 3 requests | 1 hour |
 | `POST /subscribe` | 10 requests | 1 hour |

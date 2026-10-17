@@ -3,11 +3,14 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	"api/internal/middleware"
 	"api/internal/models"
 	"api/internal/services"
 
@@ -93,12 +96,19 @@ func Login(db *gorm.DB, auditService *services.AuditService) gin.HandlerFunc {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Two-factor code required", "two_factor_required": true})
 				return
 			}
+			limitKey := strconv.FormatUint(uint64(user.ID), 10)
+			if middleware.TwoFactorLimiter.Exceeded(limitKey) {
+				auditService.LogLogin(c, req.Username, &user.ID, false)
+				c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many wrong codes for this account. Try again in 15 minutes."})
+				return
+			}
 			ok, recovery, err := checkSecondFactor(db, &user, req.Code)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 				return
 			}
 			if !ok {
+				middleware.TwoFactorLimiter.Record(limitKey)
 				auditService.LogLogin(c, req.Username, &user.ID, false)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid two-factor code", "two_factor_required": true})
 				return
@@ -126,7 +136,9 @@ func Login(db *gorm.DB, auditService *services.AuditService) gin.HandlerFunc {
 
 		// Update last_login. Only this column: a full save would write back
 		// the two-factor step read before the code was checked.
-		db.Model(&user).Update("last_login", time.Now())
+		if err := db.Model(&user).Update("last_login", time.Now()).Error; err != nil {
+			log.Printf("Login: failed to save last_login for user %d: %v", user.ID, err)
+		}
 
 		// Log successful login
 		auditService.LogLogin(c, req.Username, &user.ID, true)

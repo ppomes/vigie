@@ -27,6 +27,8 @@ func newTwoFactorRouter(t *testing.T, db *gorm.DB) *gin.Engine {
 	t.Setenv("JWT_SECRET_KEY", testJWTSecret)
 	gin.SetMode(gin.TestMode)
 	audit := services.NewAuditService(db)
+	// A fresh limiter per test: user IDs repeat across test databases.
+	middleware.TwoFactorLimiter = middleware.NewRateLimiter(5, 15*time.Minute)
 
 	r := gin.New()
 	r.POST("/login", Login(db, audit))
@@ -173,6 +175,23 @@ func TestTwoFactorLogin(t *testing.T) {
 	db.First(&stored, u.ID)
 	if stored.TwoFactorLastStep != nextStep || stored.LastLogin == nil {
 		t.Fatalf("stored user: step %d, last login %v", stored.TwoFactorLastStep, stored.LastLogin)
+	}
+}
+
+func TestTwoFactorWrongCodesLockTheAccount(t *testing.T) {
+	db := testutil.NewDB(t)
+	r := newTwoFactorRouter(t, db)
+	u := createUserWithPassword(t, db, "marie", models.RoleViewer)
+	secret, _ := enableTwoFactor(t, r, u.ID)
+
+	for i := 0; i < 5; i++ {
+		if code, _ := login(t, r, "marie", "000000"); code != http.StatusUnauthorized {
+			t.Fatalf("wrong code %d: %d", i, code)
+		}
+	}
+	next, _ := totp.Code(secret, totp.Step(time.Now())+1)
+	if code, _ := login(t, r, "marie", next); code != http.StatusTooManyRequests {
+		t.Fatalf("right code after 5 wrong ones: %d", code)
 	}
 }
 
