@@ -22,16 +22,21 @@ func legacyRouter(t *testing.T) (*gin.Engine, func(path string) *httptest.Respon
 	db := testutil.NewDB(t)
 	r := gin.New()
 	RegisterCachetRedirects(r, db)
-	s := models.Subscriber{Email: "fan@example.com", Confirmed: true, ConfirmationToken: "cachet-code", UnsubscribeToken: "unsub-tok"}
-	db.Create(&s)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(db.Create(&models.Subscriber{Email: "fan@example.com", Confirmed: true, ConfirmationToken: "cachet-code", UnsubscribeToken: "unsub-tok"}).Error)
 	c := testutil.CreateComponent(t, db, "API", "operational")
 	visible := models.Incident{Name: "API slow", Status: "monitoring", ComponentID: models.OptionalID(c.ID), Visible: true}
-	db.Create(&visible)
-	db.Create(&models.Translation{EntityID: visible.ID, EntityType: "incident", Locale: "en", Field: "message", Value: "Looking <into> it"})
+	must(db.Create(&visible).Error)
+	must(db.Create(&models.Translation{EntityID: visible.ID, EntityType: "incident", Locale: "en", Field: "message", Value: "Looking <into> it"}).Error)
 	internal := models.Incident{Name: "Internal", Status: "investigating"}
-	db.Create(&internal)
-	db.Model(&internal).Update("visible", false)
-	db.Create(&models.Settings{Key: "branding", Value: `{"title_en":"Acme Status","title_fr":"Statut Acme"}`})
+	must(db.Create(&internal).Error)
+	must(db.Model(&internal).Update("visible", false).Error)
+	must(db.Create(&models.Settings{Key: "branding", Value: `{"title_en":"Acme Status","title_fr":"Statut Acme"}`}).Error)
 	return r, func(path string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
@@ -93,7 +98,8 @@ func TestFeeds(t *testing.T) {
 	var atom struct {
 		Title   string `xml:"title"`
 		Entries []struct {
-			Title string `xml:"title"`
+			Title   string `xml:"title"`
+			Content string `xml:"content"`
 		} `xml:"entry"`
 	}
 	if err := xml.Unmarshal(w.Body.Bytes(), &atom); err != nil {
@@ -101,5 +107,28 @@ func TestFeeds(t *testing.T) {
 	}
 	if atom.Title != "Statut Acme" || len(atom.Entries) != 1 {
 		t.Fatalf("atom feed: %+v", atom)
+	}
+	// Only an English message exists: the French feed falls back to it.
+	if atom.Entries[0].Content != "Looking <into> it" {
+		t.Fatalf("atom content %q, want the English message", atom.Entries[0].Content)
+	}
+}
+
+func TestSubscriberLinksReportDatabaseFailures(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := testutil.NewDB(t)
+	r := gin.New()
+	RegisterCachetRedirects(r, db)
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB.Close()
+	for _, path := range []string{"/subscribe/manage/code", "/unsubscribe/code"} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("%s with the database down: %d, want 500", path, w.Code)
+		}
 	}
 }

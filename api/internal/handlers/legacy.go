@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -39,7 +40,10 @@ func RegisterCachetRedirects(r *gin.Engine, db *gorm.DB) {
 	// Cachet's links carry the subscriber's verify code, which the importer
 	// keeps as the confirmation token.
 	r.GET("/subscribe/manage/:code", func(c *gin.Context) {
-		s, ok := subscriberByCachetCode(db, c.Param("code"))
+		s, ok := subscriberByCachetCode(c, db)
+		if c.IsAborted() {
+			return
+		}
 		if !ok {
 			c.Redirect(http.StatusFound, publicPageURL()+"/")
 			return
@@ -47,7 +51,10 @@ func RegisterCachetRedirects(r *gin.Engine, db *gorm.DB) {
 		c.Redirect(http.StatusFound, publicPageURL()+"/?manage="+url.QueryEscape(s.UnsubscribeToken))
 	})
 	r.GET("/unsubscribe/:code", func(c *gin.Context) {
-		s, ok := subscriberByCachetCode(db, c.Param("code"))
+		s, ok := subscriberByCachetCode(c, db)
+		if c.IsAborted() {
+			return
+		}
 		if !ok {
 			c.Redirect(http.StatusFound, publicPageURL()+"/")
 			return
@@ -63,12 +70,20 @@ func RegisterCachetRedirects(r *gin.Engine, db *gorm.DB) {
 	r.GET("/atom", feed(db, renderAtom))
 }
 
-func subscriberByCachetCode(db *gorm.DB, code string) (models.Subscriber, bool) {
+// subscriberByCachetCode finds the subscriber of the link's code. When it
+// returns false, the caller sends an unknown code to the status page; a
+// database failure has already been answered with a 500.
+func subscriberByCachetCode(c *gin.Context, db *gorm.DB) (models.Subscriber, bool) {
 	var s models.Subscriber
+	code := c.Param("code")
 	if code == "" {
 		return s, false
 	}
 	err := db.Where("confirmation_token = ?", code).First(&s).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.String(http.StatusInternalServerError, "Failed to look up the subscription")
+		c.Abort()
+	}
 	return s, err == nil
 }
 
@@ -88,8 +103,10 @@ func feed(db *gorm.DB, render func(c *gin.Context, title string, items []feedIte
 	return func(c *gin.Context) {
 		locale := getLocale(c)
 		var incidents []models.Incident
-		err := db.Scopes(PublicIncidents).Preload("Translations", "locale = ?", locale).
-			Preload("Updates", updatesNewestFirst).Preload("Updates.Translations", "locale = ?", locale).
+		// English too: getTranslationValue falls back to it.
+		locales := []string{locale, "en"}
+		err := db.Scopes(PublicIncidents).Preload("Translations", "locale IN ?", locales).
+			Preload("Updates", updatesNewestFirst).Preload("Updates.Translations", "locale IN ?", locales).
 			Order("COALESCE(occurred_at, created_at) DESC").Order("id DESC").Limit(feedSize).
 			Find(&incidents).Error
 		if err != nil {
@@ -123,7 +140,7 @@ func feed(db *gorm.DB, render func(c *gin.Context, title string, items []feedIte
 // siteTitle is the page title from the branding, or "Status".
 func siteTitle(db *gorm.DB, locale string) string {
 	var setting models.Settings
-	if err := db.Where("`key` = ?", "branding").First(&setting).Error; err == nil {
+	if err := db.Where(&models.Settings{Key: "branding"}).First(&setting).Error; err == nil {
 		var b BrandingConfig
 		if json.Unmarshal([]byte(setting.Value), &b) == nil {
 			if locale == "fr" && b.TitleFR != "" {
@@ -185,9 +202,13 @@ func renderAtom(c *gin.Context, title string, items []feedItem) {
 		Updated string   `xml:"updated"`
 		Entries []entry  `xml:"entry"`
 	}
+	// The newest entry: items are ordered by when incidents occurred, and
+	// an older incident can have the latest update.
 	updated := time.Now()
-	if len(items) > 0 {
-		updated = items[0].Updated
+	for i, it := range items {
+		if i == 0 || it.Updated.After(updated) {
+			updated = it.Updated
+		}
 	}
 	out := atom{Title: title, ID: publicPageURL() + "/", Updated: updated.UTC().Format(time.RFC3339),
 		Link: []link{{Href: publicPageURL() + "/"}, {Href: publicPageURL() + "/atom", Rel: "self"}}}
