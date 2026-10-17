@@ -45,7 +45,9 @@
     "subscribing": "Subscribing...",
     "success": "Subscribed! Please check your email to confirm.",
     "error": "Failed to subscribe. Please try again.",
-    "onlySome": "Only some components"
+    "onlySome": "Only some components",
+    "emailLanguage": "Email language",
+    "already": "You are already subscribed."
   },
   "common": {
     "loading": "Loading...",

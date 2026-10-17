@@ -112,6 +112,7 @@ func main() {
 		public.GET("/settings/theme", handlers.GetTheme(db))
 		public.GET("/settings/branding", handlers.GetBranding(db))
 		public.GET("/settings/customization", handlers.GetCustomization(db))
+		public.GET("/settings/language", handlers.GetLanguage(db))
 
 		// Authentication endpoint (public - no JWT required, rate limited)
 		public.POST("/admin/login", middleware.LoginLimiter.Middleware(), handlers.Login(db, auditService))
@@ -186,6 +187,9 @@ func main() {
 
 			// Custom CSS, header and footer of the public page
 			adminOnly.PUT("/settings/customization", handlers.UpdateCustomization(db))
+
+			// Default language of the public page
+			adminOnly.PUT("/settings/language", handlers.UpdateLanguage(db))
 
 			// Incident templates
 			adminOnly.POST("/templates", handlers.CreateTemplate(db))

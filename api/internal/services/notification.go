@@ -506,18 +506,7 @@ func (n *NotificationService) getTranslation(translations []models.Translation, 
 	return ""
 }
 
-// getTranslationWithFallback retrieves a translation with fallback chain: locale -> English -> default
+// getTranslationWithFallback retrieves a translation, see models.TranslatedValue.
 func (n *NotificationService) getTranslationWithFallback(translations []models.Translation, field, locale, defaultValue string) string {
-	// Try requested locale first
-	if value := n.getTranslation(translations, field, locale); value != "" {
-		return value
-	}
-	// Fall back to English if different from requested locale
-	if locale != "en" {
-		if value := n.getTranslation(translations, field, "en"); value != "" {
-			return value
-		}
-	}
-	// Return default value
-	return defaultValue
+	return models.TranslatedValue(translations, field, locale, defaultValue)
 }

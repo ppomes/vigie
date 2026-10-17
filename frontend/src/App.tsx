@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getComponents, getComponentGroups, getIncidents, getMaintenances, getStatus, getCustomization, subscribe, getSubscription, updateSubscription, Component, ComponentGroup, Incident, Maintenance, SystemStatus, Customization } from './lib/api';
+import { getComponents, getComponentGroups, getIncidents, getMaintenances, getStatus, getCustomization, getLanguageSetting, subscribe, getSubscription, updateSubscription, Component, ComponentGroup, Incident, Maintenance, SystemStatus, Customization } from './lib/api';
 import { useTheme } from './themes/ThemeContext';
 import { useBranding } from './themes/BrandingContext';
 import { setCustomCSS } from './themes/styles';
+import { applyPageLanguage, chooseLanguage, SUPPORTED } from './i18n/i18n';
 
 const statusClasses: Record<string, string> = {
   operational: 'status-operational',
@@ -33,14 +34,14 @@ function LanguageSwitcher() {
     <div className="flex items-center gap-2">
       <span className="text-sm text-muted">{t('language.switchTo')}:</span>
       <button
-        onClick={() => i18n.changeLanguage('en')}
+        onClick={() => chooseLanguage('en')}
         className={`px-3 py-1 text-sm rounded ${i18n.language === 'en' ? 'btn-primary' : 'bg-gray-200 hover:bg-gray-300'}`}
         style={i18n.language === 'en' ? {} : { color: 'var(--color-text)' }}
       >
         EN
       </button>
       <button
-        onClick={() => i18n.changeLanguage('fr')}
+        onClick={() => chooseLanguage('fr')}
         className={`px-3 py-1 text-sm rounded ${i18n.language === 'fr' ? 'btn-primary' : 'bg-gray-200 hover:bg-gray-300'}`}
         style={i18n.language === 'fr' ? {} : { color: 'var(--color-text)' }}
       >
@@ -80,6 +81,11 @@ const statusSeverity: Record<string, number> = {
   under_maintenance: 1,
   operational: 0,
 };
+
+// dateLocale formats dates in the page's language, not the browser's.
+function dateLocale(language: string): string {
+  return language === 'fr' ? 'fr-FR' : 'en-US';
+}
 
 function worstStatus(components: Component[]): Component['status'] {
   return components.reduce<Component['status']>(
@@ -232,11 +238,11 @@ function IncidentsList() {
     // Try current locale
     const translation = incident.translations?.find(t => t.field === field && t.locale === locale);
     if (translation?.value) return translation.value;
+    // Then the incident's own name, in the language it was written in
+    if (field === 'name' && incident.name) return incident.name;
     // Fall back to English
     const enTranslation = incident.translations?.find(t => t.field === field && t.locale === 'en');
-    if (enTranslation?.value) return enTranslation.value;
-    // Fall back to default (for name only)
-    return field === 'name' ? incident.name : '';
+    return enTranslation?.value || '';
   };
 
   if (loading) return <p className="text-muted">{t('common.loading')}</p>;
@@ -276,7 +282,7 @@ function IncidentsList() {
                 {(incident.updates || []).map(update => (
                   <li key={update.id} className="text-sm">
                     <span className="font-medium">{t(`incidentStatus.${update.status}`)}</span>
-                    <span className="text-muted"> · {new Date(update.created_at).toLocaleString()}</span>
+                    <span className="text-muted"> · {new Date(update.created_at).toLocaleString(dateLocale(i18n.language))}</span>
                     {update.translations?.find(tr => tr.field === 'message')?.value && (
                       <p>{update.translations.find(tr => tr.field === 'message')?.value}</p>
                     )}
@@ -288,7 +294,7 @@ function IncidentsList() {
               <p className="text-sm mb-2">{incidentMessage}</p>
             )}
             <p className="text-sm text-muted">
-              {new Date(incident.occurred_at || incident.created_at).toLocaleString()}
+              {new Date(incident.occurred_at || incident.created_at).toLocaleString(dateLocale(i18n.language))}
             </p>
           </div>
         );
@@ -312,7 +318,7 @@ function MaintenancesList() {
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
-    return date.toLocaleString(i18n.language === 'fr' ? 'fr-FR' : 'en-US', {
+    return date.toLocaleString(dateLocale(i18n.language), {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -384,6 +390,7 @@ function ManageSubscription({ token }: { token: string }) {
   const [email, setEmail] = useState('');
   const [all, setAll] = useState(true);
   const [ids, setIds] = useState<number[]>([]);
+  const [locale, setLocale] = useState('');
   const [state, setState] = useState<'loading' | 'ready' | 'saved' | 'error'>('loading');
   const [message, setMessage] = useState('');
 
@@ -393,6 +400,7 @@ function ManageSubscription({ token }: { token: string }) {
         setEmail(choice.email || '');
         setAll(choice.global);
         setIds(choice.component_ids || []);
+        setLocale(choice.locale || '');
         setState('ready');
       })
       .catch(() => {
@@ -404,7 +412,7 @@ function ManageSubscription({ token }: { token: string }) {
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateSubscription(token, { global: all, component_ids: all ? [] : ids });
+      await updateSubscription(token, { global: all, component_ids: all ? [] : ids, locale: locale || undefined });
       setState('saved');
       setMessage(t('manage.saved'));
     } catch {
@@ -429,6 +437,7 @@ function ManageSubscription({ token }: { token: string }) {
         {t('manage.some')}
       </label>
       {!all && <ComponentChoice value={ids} onChange={setIds} />}
+      <EmailLanguage value={locale} onChange={setLocale} />
       <button type="submit" disabled={!all && ids.length === 0} className="px-6 py-2 btn-primary rounded-lg disabled:opacity-50">
         {t('manage.save')}
       </button>
@@ -437,9 +446,31 @@ function ManageSubscription({ token }: { token: string }) {
   );
 }
 
+// EmailLanguage picks the language of a subscriber's emails.
+function EmailLanguage({ value, onChange }: { value: string; onChange: (lng: string) => void }) {
+  const { t } = useTranslation();
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      {t('subscription.emailLanguage')}
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="px-2 py-1 rounded"
+        style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-card-border)', color: 'var(--color-text)' }}
+      >
+        <option value="en">English</option>
+        <option value="fr">Français</option>
+      </select>
+    </label>
+  );
+}
+
 function SubscriptionForm() {
   const { t, i18n } = useTranslation();
   const [email, setEmail] = useState('');
+  // Preset to the page's language, until the visitor picks another.
+  const [locale, setLocale] = useState<string | null>(null);
+  const emailLocale = locale ?? (SUPPORTED.includes(i18n.language) ? i18n.language : 'en');
   const [onlySome, setOnlySome] = useState(false);
   const [componentIds, setComponentIds] = useState<number[]>([]);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -449,14 +480,14 @@ function SubscriptionForm() {
     e.preventDefault();
     setStatus('loading');
     try {
-      // Subscribe with current language preference
-      const result = await subscribe(email, i18n.language, onlySome ? componentIds : []);
+      const result = await subscribe(email, emailLocale, onlySome ? componentIds : []);
       setStatus('success');
-      setMessage(result.message || t('subscription.success'));
+      // The page's own text, not the API's message, which is in English.
+      setMessage(t(result.already_subscribed ? 'subscription.already' : 'subscription.success'));
       setEmail('');
     } catch (err) {
       setStatus('error');
-      setMessage(err instanceof Error ? err.message : t('subscription.error'));
+      setMessage(t('subscription.error'));
     }
   };
 
@@ -489,6 +520,7 @@ function SubscriptionForm() {
         {t('subscription.onlySome')}
       </label>
       {onlySome && <ComponentChoice value={componentIds} onChange={setComponentIds} />}
+      <EmailLanguage value={emailLocale} onChange={setLocale} />
       {message && (
         <p className={status === 'success' ? 'text-green-600' : 'text-red-600'}>{message}</p>
       )}
@@ -690,8 +722,25 @@ export default function App() {
   );
 }
 
+// usePageLanguage applies the admin's language setting, and reports when it
+// is done, so the page does not show in one language and then another.
+function usePageLanguage(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    getLanguageSetting()
+      .then(applyPageLanguage)
+      .catch(() => {
+        // Keep the browser's language.
+      })
+      .finally(() => setReady(true));
+  }, []);
+  return ready;
+}
+
 function Page() {
-  const { theme, loading } = useTheme();
+  const { theme, loading: themeLoading } = useTheme();
+  const languageReady = usePageLanguage();
+  const loading = themeLoading || !languageReady;
   const manageToken = new URLSearchParams(window.location.search).get('manage');
 
   if (loading) {

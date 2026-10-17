@@ -20,3 +20,27 @@ type Translation struct {
 // The MySQL schema enforces it with the chk_translation_entity constraint,
 // which database.EnsureSchema keeps in sync.
 var TranslationEntityTypes = []string{"component", "incident", "maintenance", "incident_update", "component_group"}
+
+// TranslatedValue picks the text of field for locale: its translation in
+// that locale, else own, the entity's own column, which holds the text in
+// the language it was written in (French for content imported from a
+// French Cachet), else the English translation. own comes before English
+// so that a French page shows imported French text even once an English
+// translation exists.
+func TranslatedValue(translations []Translation, field, locale, own string) string {
+	find := func(l string) string {
+		for _, t := range translations {
+			if t.Field == field && t.Locale == l && t.Value != "" {
+				return t.Value
+			}
+		}
+		return ""
+	}
+	if v := find(locale); v != "" {
+		return v
+	}
+	if own != "" {
+		return own
+	}
+	return find("en")
+}

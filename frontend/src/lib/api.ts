@@ -106,7 +106,7 @@ export async function getStatus(): Promise<SystemStatus> {
 }
 
 // componentIds limits notifications to these components; empty means all.
-export async function subscribe(email: string, locale: string = 'en', componentIds: number[] = []): Promise<{ message: string }> {
+export async function subscribe(email: string, locale: string = 'en', componentIds: number[] = []): Promise<{ message: string; already_subscribed?: boolean }> {
   return fetchAPI<{ message: string }>('/subscribe', {
     method: 'POST',
     body: JSON.stringify({ email, locale, component_ids: componentIds }),
@@ -118,6 +118,8 @@ export interface SubscriptionChoice {
   email?: string;
   global: boolean;
   component_ids: number[];
+  // Language of the notification emails
+  locale?: string;
 }
 
 export async function getSubscription(token: string): Promise<SubscriptionChoice> {
@@ -129,6 +131,17 @@ export async function updateSubscription(token: string, choice: SubscriptionChoi
     method: 'PUT',
     body: JSON.stringify(choice),
   });
+}
+
+// LanguageSetting is how the page picks a visitor's language: always the
+// default ("fixed"), or the browser's ("browser").
+export interface LanguageSetting {
+  default: string;
+  mode: 'fixed' | 'browser';
+}
+
+export async function getLanguageSetting(): Promise<LanguageSetting> {
+  return fetchAPI<LanguageSetting>('/settings/language');
 }
 
 export async function getTheme(): Promise<string> {

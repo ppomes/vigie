@@ -3,6 +3,7 @@ import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey, IncidentUpdateInput, ComponentGroup } from './lib/api';
 import TwoFactorModal from './pages/TwoFactor';
 import CustomizationSection from './pages/Customization';
+import PageLanguageSection from './pages/PageLanguage';
 
 // User context for role-based access
 interface UserContextType {
@@ -1775,6 +1776,10 @@ function SettingsPage() {
       <hr className="my-8" />
 
       <CustomizationSection />
+
+      <hr className="my-8" />
+
+      <PageLanguageSection />
     </div>
   );
 }

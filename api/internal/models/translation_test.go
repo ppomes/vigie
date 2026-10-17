@@ -356,3 +356,24 @@ func TestMultipleTranslationsPerEntity(t *testing.T) {
 		t.Errorf("Expected 2 French translations for entity 1, got %d", frCount)
 	}
 }
+
+func TestTranslatedValue(t *testing.T) {
+	tr := []Translation{
+		{Locale: "en", Field: "name", Value: "Firewall replacement"},
+		{Locale: "en", Field: "message", Value: "Brief interruptions possible."},
+		{Locale: "fr", Field: "message", Value: "Coupures brèves possibles."},
+	}
+	for _, c := range []struct{ field, locale, own, want string }{
+		{"name", "en", "Remplacement du pare-feu", "Firewall replacement"},
+		// No French name: the own column, in French, beats the English one.
+		{"name", "fr", "Remplacement du pare-feu", "Remplacement du pare-feu"},
+		{"message", "fr", "", "Coupures brèves possibles."},
+		// Nothing in the locale and no own text: English.
+		{"message", "de", "", "Brief interruptions possible."},
+		{"description", "fr", "", ""},
+	} {
+		if got := TranslatedValue(tr, c.field, c.locale, c.own); got != c.want {
+			t.Errorf("%s/%s: got %q, want %q", c.field, c.locale, got, c.want)
+		}
+	}
+}
