@@ -46,7 +46,8 @@
     "success": "Inscrit ! Veuillez vérifier votre email pour confirmer.",
     "error": "Échec de l'inscription. Veuillez réessayer.",
     "onlySome": "Seulement certains composants",
-    "emailLanguage": "Langue des e-mails"
+    "emailLanguage": "Langue des e-mails",
+    "already": "Vous êtes déjà abonné."
   },
   "common": {
     "loading": "Chargement...",

@@ -106,7 +106,7 @@ export async function getStatus(): Promise<SystemStatus> {
 }
 
 // componentIds limits notifications to these components; empty means all.
-export async function subscribe(email: string, locale: string = 'en', componentIds: number[] = []): Promise<{ message: string }> {
+export async function subscribe(email: string, locale: string = 'en', componentIds: number[] = []): Promise<{ message: string; already_subscribed?: boolean }> {
   return fetchAPI<{ message: string }>('/subscribe', {
     method: 'POST',
     body: JSON.stringify({ email, locale, component_ids: componentIds }),

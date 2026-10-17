@@ -118,6 +118,8 @@ func Subscribe(db *gorm.DB, emailService services.EmailService) gin.HandlerFunc 
 				c.JSON(http.StatusOK, gin.H{
 					"message": "Email is already subscribed to status updates",
 					"email":   email,
+					// For clients that show their own, translated, message
+					"already_subscribed": true,
 				})
 				return
 			}

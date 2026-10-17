@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"api/internal/language"
@@ -115,5 +116,15 @@ func TestSubscriptionLanguage(t *testing.T) {
 	}
 	if code := status(t, r, http.MethodPut, "/subscriptions?token=tok", map[string]any{"global": true, "locale": "de"}); code != http.StatusBadRequest {
 		t.Fatalf("unsupported language: %d", code)
+	}
+
+	// A confirmed subscriber subscribing again is told so in a field the
+	// page can translate.
+	if err := db.Model(&b).Update("confirmed", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	w := call(t, r, http.MethodPost, "/subscribe", map[string]any{"email": "b@example.com"})
+	if !strings.Contains(w.Body.String(), `"already_subscribed":true`) {
+		t.Fatalf("subscribing again: %s", w.Body)
 	}
 }

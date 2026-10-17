@@ -82,6 +82,11 @@ const statusSeverity: Record<string, number> = {
   operational: 0,
 };
 
+// dateLocale formats dates in the page's language, not the browser's.
+function dateLocale(language: string): string {
+  return language === 'fr' ? 'fr-FR' : 'en-US';
+}
+
 function worstStatus(components: Component[]): Component['status'] {
   return components.reduce<Component['status']>(
     (worst, c) => ((statusSeverity[c.status] ?? 0) > (statusSeverity[worst] ?? 0) ? c.status : worst),
@@ -277,7 +282,7 @@ function IncidentsList() {
                 {(incident.updates || []).map(update => (
                   <li key={update.id} className="text-sm">
                     <span className="font-medium">{t(`incidentStatus.${update.status}`)}</span>
-                    <span className="text-muted"> · {new Date(update.created_at).toLocaleString()}</span>
+                    <span className="text-muted"> · {new Date(update.created_at).toLocaleString(dateLocale(i18n.language))}</span>
                     {update.translations?.find(tr => tr.field === 'message')?.value && (
                       <p>{update.translations.find(tr => tr.field === 'message')?.value}</p>
                     )}
@@ -289,7 +294,7 @@ function IncidentsList() {
               <p className="text-sm mb-2">{incidentMessage}</p>
             )}
             <p className="text-sm text-muted">
-              {new Date(incident.occurred_at || incident.created_at).toLocaleString()}
+              {new Date(incident.occurred_at || incident.created_at).toLocaleString(dateLocale(i18n.language))}
             </p>
           </div>
         );
@@ -313,7 +318,7 @@ function MaintenancesList() {
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
-    return date.toLocaleString(i18n.language === 'fr' ? 'fr-FR' : 'en-US', {
+    return date.toLocaleString(dateLocale(i18n.language), {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -477,11 +482,12 @@ function SubscriptionForm() {
     try {
       const result = await subscribe(email, emailLocale, onlySome ? componentIds : []);
       setStatus('success');
-      setMessage(result.message || t('subscription.success'));
+      // The page's own text, not the API's message, which is in English.
+      setMessage(t(result.already_subscribed ? 'subscription.already' : 'subscription.success'));
       setEmail('');
     } catch (err) {
       setStatus('error');
-      setMessage(err instanceof Error ? err.message : t('subscription.error'));
+      setMessage(t('subscription.error'));
     }
   };
 
