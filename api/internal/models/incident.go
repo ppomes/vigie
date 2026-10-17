@@ -16,14 +16,14 @@ type Incident struct {
 	// incident that affects no component.
 	ComponentID *uint `gorm:"index" json:"component_id"`
 	// Visible is false for internal incidents, kept off the public page.
-	Visible bool `gorm:"not null;default:true" json:"visible"`
+	Visible bool `gorm:"not null;default:1" json:"visible"`
 	// Stickied incidents are pinned at the top of the public page.
-	Stickied bool `gorm:"not null;default:false" json:"stickied"`
+	Stickied bool `gorm:"not null;default:0" json:"stickied"`
 	// OccurredAt is when the incident started, which can be before it was
 	// posted. It defaults to the creation time.
 	OccurredAt *time.Time `gorm:"index" json:"occurred_at,omitempty"`
 	// Notifications records whether subscribers were notified of it.
-	Notifications bool `gorm:"not null;default:true" json:"notifications"`
+	Notifications bool `gorm:"not null;default:1" json:"notifications"`
 	// UserID is the author.
 	UserID *uint `gorm:"index" json:"user_id,omitempty"`
 	Component    *Component     `gorm:"foreignKey:ComponentID" json:"component,omitempty"`

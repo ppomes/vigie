@@ -24,11 +24,11 @@ type User struct {
 	Email               string         `gorm:"size:255;not null;unique;index" json:"email"`
 	Password            string         `gorm:"size:255;not null" json:"-"` // Hidden from JSON for security
 	Role                string         `gorm:"size:50;not null;default:'viewer'" json:"role"`
-	Active              bool           `gorm:"default:true" json:"active"`
+	Active              bool           `gorm:"default:1" json:"active"`
 	LastLogin           *time.Time     `json:"last_login,omitempty"`
 	PasswordResetToken  *string        `gorm:"size:255;index" json:"-"`
 	PasswordResetExpiry *time.Time     `json:"-"`
-	ForcePasswordChange bool           `gorm:"default:false" json:"force_password_change"`
+	ForcePasswordChange bool           `gorm:"default:0" json:"force_password_change"`
 	CreatedAt           time.Time      `json:"created_at"`
 	UpdatedAt           time.Time      `json:"updated_at"`
 	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`

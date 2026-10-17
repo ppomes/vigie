@@ -1,11 +1,14 @@
 package database
 
 import (
+	"sync"
 	"testing"
 	"time"
 
 	"api/internal/models"
 	"api/internal/testutil"
+
+	"gorm.io/gorm/schema"
 )
 
 func TestCheckAllowsAll(t *testing.T) {
@@ -55,5 +58,22 @@ func TestBackfillAffectedComponents(t *testing.T) {
 	db.Where("maintenance_id = ?", m.ID).Find(&mc)
 	if len(mc) != 1 || mc[0].PreviousStatus != "partial_outage" {
 		t.Fatalf("maintenance components: %+v", mc)
+	}
+}
+
+// TestBooleanDefaultsAreNumeric guards against default:true and
+// default:false in GORM tags: MySQL reports boolean defaults as 1 and 0, so
+// AutoMigrate would alter, and rebuild, those tables on every start.
+func TestBooleanDefaultsAreNumeric(t *testing.T) {
+	for _, m := range Models() {
+		s, err := schema.Parse(m, &sync.Map{}, schema.NamingStrategy{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range s.Fields {
+			if f.DataType == schema.Bool && f.HasDefaultValue && f.DefaultValue != "1" && f.DefaultValue != "0" {
+				t.Errorf("%s.%s: default %q, write default:1 or default:0", s.Table, f.DBName, f.DefaultValue)
+			}
+		}
 	}
 }

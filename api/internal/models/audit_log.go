@@ -38,7 +38,7 @@ type AuditLog struct {
 	Details    string    `gorm:"type:text" json:"details,omitempty"`
 	IPAddress  string    `gorm:"size:45" json:"ip_address"`
 	UserAgent  string    `gorm:"size:500" json:"user_agent,omitempty"`
-	Success    bool      `gorm:"default:true" json:"success"`
+	Success    bool      `gorm:"default:1" json:"success"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
