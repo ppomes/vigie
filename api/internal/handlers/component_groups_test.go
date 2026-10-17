@@ -167,3 +167,25 @@ func TestComponentGroupValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestClearGroupTranslations(t *testing.T) {
+	db := testutil.NewDB(t)
+	r := newRouter(db)
+	id := createGroup(t, r, map[string]any{
+		"name": "Web", "translations": []map[string]string{{"locale": "fr", "field": "name", "value": "Site"}},
+	})
+	count := func() int64 {
+		var n int64
+		db.Model(&models.Translation{}).Where("entity_type = ? AND entity_id = ?", "component_group", id).Count(&n)
+		return n
+	}
+	// Absent keeps them; an empty list clears them.
+	call(t, r, http.MethodPut, fmt.Sprintf("/component-groups/%d", id), map[string]any{"order": 3})
+	if count() != 1 {
+		t.Fatal("an update without translations removed them")
+	}
+	call(t, r, http.MethodPut, fmt.Sprintf("/component-groups/%d", id), map[string]any{"translations": []any{}})
+	if count() != 0 {
+		t.Fatal("an empty translations list did not clear them")
+	}
+}

@@ -18,7 +18,16 @@ type ComponentGroupRequest struct {
 	Collapse   string `json:"collapse" binding:"omitempty,oneof=never always operational"`
 	Visibility string `json:"visibility" binding:"omitempty,oneof=public authenticated"`
 	// Translations holds the group name per locale. Only "name" is accepted.
-	Translations []TranslationRequest `json:"translations"`
+	// On update, a present list, even empty, replaces the translations;
+	// absent leaves them unchanged.
+	Translations *[]TranslationRequest `json:"translations"`
+}
+
+func (r ComponentGroupRequest) translations() []TranslationRequest {
+	if r.Translations == nil {
+		return nil
+	}
+	return *r.Translations
 }
 
 func validateGroupTranslations(translations []TranslationRequest) string {
@@ -72,7 +81,7 @@ func CreateComponentGroup(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
 			return
 		}
-		if msg := validateGroupTranslations(req.Translations); msg != "" {
+		if msg := validateGroupTranslations(req.translations()); msg != "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 			return
 		}
@@ -96,7 +105,7 @@ func CreateComponentGroup(db *gorm.DB) gin.HandlerFunc {
 			if err := tx.Create(&group).Error; err != nil {
 				return err
 			}
-			return replaceGroupTranslations(tx, group.ID, req.Translations)
+			return replaceGroupTranslations(tx, group.ID, req.translations())
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create component group"})
@@ -121,7 +130,7 @@ func UpdateComponentGroup(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format", "details": err.Error()})
 			return
 		}
-		if msg := validateGroupTranslations(req.Translations); msg != "" {
+		if msg := validateGroupTranslations(req.translations()); msg != "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 			return
 		}
@@ -152,8 +161,8 @@ func UpdateComponentGroup(db *gorm.DB) gin.HandlerFunc {
 			if err := tx.Save(&group).Error; err != nil {
 				return err
 			}
-			if len(req.Translations) > 0 {
-				return replaceGroupTranslations(tx, group.ID, req.Translations)
+			if req.Translations != nil {
+				return replaceGroupTranslations(tx, group.ID, *req.Translations)
 			}
 			return nil
 		})

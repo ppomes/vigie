@@ -97,13 +97,19 @@ function initiallyCollapsed(group: ComponentGroup): boolean {
   return false;
 }
 
+// A component's name in the reader's language, falling back to its name.
+function componentName(component: Component, locale: string): string {
+  return component.translations?.find(tr => tr.field === 'name' && tr.locale === locale)?.value || component.name;
+}
+
 function ComponentRow({ component, asSidebar }: { component: Component; asSidebar: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const name = componentName(component, i18n.language);
   if (asSidebar) {
     return (
       <div className="flex items-center gap-2 py-2">
         <div className={`w-2 h-2 rounded-full ${statusClasses[component.status]}`} />
-        <span className="text-sm">{component.name}</span>
+        <span className="text-sm">{name}</span>
       </div>
     );
   }
@@ -111,7 +117,7 @@ function ComponentRow({ component, asSidebar }: { component: Component; asSideba
     <div className="flex items-center justify-between py-3 border-b last:border-0" style={{ borderColor: 'var(--color-card-border)' }}>
       <div className="flex items-center gap-3">
         <div className={`w-3 h-3 rounded-full ${statusClasses[component.status]}`} />
-        <span className="font-medium">{component.name}</span>
+        <span className="font-medium">{name}</span>
       </div>
       <span className="text-sm text-muted">{t(`componentStatus.${component.status}`)}</span>
     </div>
