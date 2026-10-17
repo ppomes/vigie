@@ -236,7 +236,7 @@ function IncidentsList() {
         const incidentMessage = getTranslation(incident, 'message');
 
         return (
-          <div key={incident.id} className="card p-4">
+          <div key={incident.id} id={`incident-${incident.id}`} className="card p-4">
             <div className="flex items-center gap-2 mb-2">
               <div className={`w-2 h-2 rounded-full ${incidentStatusClasses[incident.status]}`} />
               <span className="font-medium">{incidentName}</span>

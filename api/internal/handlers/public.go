@@ -24,21 +24,21 @@ func GetStatus(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Count total components
 		var componentCount int64
-		if err := db.Model(&models.Component{}).Scopes(publicComponents).Count(&componentCount).Error; err != nil {
+		if err := db.Model(&models.Component{}).Scopes(PublicComponents).Count(&componentCount).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch system status"})
 			return
 		}
 
 		// Count active incidents (not resolved)
 		var activeIncidents int64
-		if err := db.Model(&models.Incident{}).Scopes(publicIncidents).Where("status != ?", "resolved").Count(&activeIncidents).Error; err != nil {
+		if err := db.Model(&models.Incident{}).Scopes(PublicIncidents).Where("status != ?", "resolved").Count(&activeIncidents).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch system status"})
 			return
 		}
 
 		// Count components with issues
 		var componentsWithIssues int64
-		if err := db.Model(&models.Component{}).Scopes(publicComponents).
+		if err := db.Model(&models.Component{}).Scopes(PublicComponents).
 			Where("status IN ?", []string{"degraded_performance", "partial_outage", "major_outage"}).
 			Count(&componentsWithIssues).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch system status"})
@@ -51,7 +51,7 @@ func GetStatus(db *gorm.DB) gin.HandlerFunc {
 
 		if componentsWithIssues > 0 {
 			var majorOutages int64
-			db.Model(&models.Component{}).Scopes(publicComponents).Where("status = ?", "major_outage").Count(&majorOutages)
+			db.Model(&models.Component{}).Scopes(PublicComponents).Where("status = ?", "major_outage").Count(&majorOutages)
 
 			if majorOutages > 0 {
 				status = "outage"
@@ -82,7 +82,7 @@ func GetComponents(db *gorm.DB) gin.HandlerFunc {
 		// Components in a group hidden from the public are left out.
 		var components []models.Component
 		if err := models.ByDisplayOrder(db).Preload("Translations", "locale = ?", locale).
-			Scopes(publicComponents).
+			Scopes(PublicComponents).
 			Find(&components).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch components"})
 			return
@@ -100,17 +100,17 @@ func publicGroupIDs(db *gorm.DB) *gorm.DB {
 	return db.Model(&models.ComponentGroup{}).Select("id").Where("visibility = ?", models.GroupVisibilityPublic)
 }
 
-// publicComponents restricts a component query to what the public page
+// PublicComponents restricts a component query to what the public page
 // shows: enabled components, outside groups hidden from the public.
-func publicComponents(db *gorm.DB) *gorm.DB {
+func PublicComponents(db *gorm.DB) *gorm.DB {
 	return db.Where("enabled = ?", true).
 		Where("group_id IS NULL OR group_id IN (?)", publicGroupIDs(db.Session(&gorm.Session{NewDB: true})))
 }
 
-// publicAffectedComponents restricts the preloaded components of an incident
+// PublicAffectedComponents restricts the preloaded components of an incident
 // or a maintenance to the ones the public page shows, in order.
-func publicAffectedComponents(db *gorm.DB) *gorm.DB {
-	ids := publicComponents(db.Session(&gorm.Session{NewDB: true}).Model(&models.Component{}).Select("id"))
+func PublicAffectedComponents(db *gorm.DB) *gorm.DB {
+	ids := PublicComponents(db.Session(&gorm.Session{NewDB: true}).Model(&models.Component{}).Select("id"))
 	return db.Where("component_id IN (?)", ids).Order("id")
 }
 
@@ -119,8 +119,8 @@ func enabledComponents(db *gorm.DB) *gorm.DB {
 	return models.ByDisplayOrder(db).Where("enabled = ?", true)
 }
 
-// publicIncidents restricts an incident query to visible incidents.
-func publicIncidents(db *gorm.DB) *gorm.DB {
+// PublicIncidents restricts an incident query to visible incidents.
+func PublicIncidents(db *gorm.DB) *gorm.DB {
 	return db.Where("visible = ?", true)
 }
 
@@ -176,11 +176,11 @@ func GetIncidents(db *gorm.DB) gin.HandlerFunc {
 		// Build query with translations and component relationship
 		// The timeline is public; the authors' accounts are not loaded.
 		query := db.Preload("Translations", "locale = ?", locale).
-			Preload("Component", publicComponents).
+			Preload("Component", PublicComponents).
 			Preload("Component.Translations", "locale = ?", locale).
 			Preload("Updates", updatesNewestFirst).
 			Preload("Updates.Translations", "locale = ?", locale).
-			Preload("Components", publicAffectedComponents).
+			Preload("Components", PublicAffectedComponents).
 			Preload("Components.Component").
 			Preload("Components.Component.Translations", "locale = ?", locale)
 
@@ -193,7 +193,7 @@ func GetIncidents(db *gorm.DB) gin.HandlerFunc {
 		// by when they occurred. Incidents created before occurred_at existed
 		// fall back to their creation time.
 		var incidents []models.Incident
-		if err := query.Scopes(publicIncidents).
+		if err := query.Scopes(PublicIncidents).
 			Order("stickied DESC").Order("COALESCE(occurred_at, created_at) DESC").Order("id DESC").
 			Find(&incidents).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch incidents"})
