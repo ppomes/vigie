@@ -12,10 +12,32 @@ import (
 // EnsureSchema applies schema changes that AutoMigrate cannot make. It is
 // idempotent and runs at startup, after AutoMigrate.
 func EnsureSchema(db *gorm.DB) error {
-	if db.Dialector.Name() != "mysql" {
-		return nil
+	if db.Dialector.Name() == "mysql" {
+		if err := ensureTranslationEntityCheck(db); err != nil {
+			return err
+		}
 	}
-	return ensureTranslationEntityCheck(db)
+	return backfillAffectedComponents(db)
+}
+
+// backfillAffectedComponents gives incidents and maintenances created before
+// incident_components and maintenance_components existed a row for their
+// main component. A maintenance in progress keeps the status it recorded.
+// Rows are only added where none exist, so this is idempotent.
+func backfillAffectedComponents(db *gorm.DB) error {
+	if err := db.Exec(`INSERT INTO incident_components (incident_id, component_id, component_status, created_at, updated_at)
+		SELECT i.id, i.component_id, '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM incidents i
+		WHERE i.component_id IS NOT NULL AND i.component_id <> 0
+		AND NOT EXISTS (SELECT 1 FROM incident_components ic WHERE ic.incident_id = i.id)`).Error; err != nil {
+		return fmt.Errorf("backfill incident components: %w", err)
+	}
+	if err := db.Exec(`INSERT INTO maintenance_components (maintenance_id, component_id, previous_status, created_at, updated_at)
+		SELECT m.id, m.component_id, COALESCE(m.previous_component_status, ''), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM maintenances m
+		WHERE m.component_id IS NOT NULL AND m.component_id <> 0
+		AND NOT EXISTS (SELECT 1 FROM maintenance_components mc WHERE mc.maintenance_id = m.id)`).Error; err != nil {
+		return fmt.Errorf("backfill maintenance components: %w", err)
+	}
+	return nil
 }
 
 // ensureTranslationEntityCheck widens the chk_translation_entity constraint,

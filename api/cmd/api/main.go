@@ -50,6 +50,8 @@ func main() {
 		&models.IncidentUpdate{},
 		&models.ComponentGroup{},
 		&models.Tag{},
+		&models.IncidentComponent{},
+		&models.MaintenanceComponent{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}

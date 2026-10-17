@@ -15,9 +15,11 @@ type Maintenance struct {
 	Component    Component      `gorm:"foreignKey:ComponentID" json:"component,omitempty"`
 	StartAt      time.Time      `gorm:"not null" json:"start_at"`
 	EndAt        time.Time      `gorm:"not null" json:"end_at"`
-	// PreviousComponentStatus is the component status to restore when this
-	// maintenance ends. It is set when the maintenance starts.
+	// PreviousComponentStatus is superseded by MaintenanceComponent.
+	// PreviousStatus; it is only read to backfill older maintenances.
 	PreviousComponentStatus string `gorm:"size:50" json:"-"`
+	// Components lists every covered component, including ComponentID.
+	Components []MaintenanceComponent `gorm:"foreignKey:MaintenanceID" json:"components,omitempty"`
 	Translations []Translation  `gorm:"polymorphic:Entity;polymorphicValue:maintenance" json:"translations,omitempty"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`

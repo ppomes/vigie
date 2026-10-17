@@ -252,6 +252,33 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
+-- AFFECTED COMPONENTS
+-- =============================================================================
+-- Every component an incident affects, and every component a maintenance
+-- covers, including the main component_id.
+CREATE TABLE IF NOT EXISTS incident_components (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    component_id BIGINT UNSIGNED NOT NULL,
+    component_status VARCHAR(50) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY idx_incident_component (incident_id, component_id),
+    INDEX idx_incident_components_component_id (component_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS maintenance_components (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    maintenance_id BIGINT UNSIGNED NOT NULL,
+    component_id BIGINT UNSIGNED NOT NULL,
+    previous_status VARCHAR(50) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY idx_maintenance_component (maintenance_id, component_id),
+    INDEX idx_maintenance_components_component_id (component_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
 -- TAGS
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS tags (

@@ -131,7 +131,12 @@ export interface Translation {
 // Fields accepted when creating or updating an incident. component_status,
 // when set, changes the status of the affected component; when omitted, the
 // component status is left as it is.
-export type IncidentInput = Partial<Omit<Incident, 'updates'>> & { component_status?: string; notify?: boolean };
+export type IncidentInput = Partial<Omit<Incident, 'updates' | 'components'>> & {
+  component_status?: string;
+  notify?: boolean;
+  // Replaces the affected components; status, when set, is applied
+  components?: { component_id: number; status?: string }[];
+};
 
 export interface IncidentUpdate {
   id: number;
@@ -150,6 +155,8 @@ export interface Incident {
   translations?: Translation[];
   // Timeline, newest first
   updates?: IncidentUpdate[];
+  // Every affected component, main one included
+  components?: { component_id: number; component_status?: string }[];
   // false for internal incidents, kept off the public page and from subscribers
   visible: boolean;
   stickied: boolean;
@@ -320,9 +327,9 @@ export const api = {
 
   // Maintenances
   getMaintenances: () => fetchAPI<{ maintenances: Maintenance[] }>('/admin/maintenances').then(r => r.maintenances || []),
-  createMaintenance: (data: Partial<Maintenance> & { translations?: { locale: string; field: string; value: string }[] }) =>
+  createMaintenance: (data: Partial<Omit<Maintenance, 'components'>> & { component_ids?: number[]; translations?: { locale: string; field: string; value: string }[] }) =>
     fetchAPI<{ maintenance: Maintenance }>('/admin/maintenances', { method: 'POST', body: JSON.stringify(data) }),
-  updateMaintenance: (id: number, data: Partial<Maintenance> & { translations?: { locale: string; field: string; value: string }[] }) =>
+  updateMaintenance: (id: number, data: Partial<Omit<Maintenance, 'components'>> & { component_ids?: number[]; translations?: { locale: string; field: string; value: string }[] }) =>
     fetchAPI<{ maintenance: Maintenance }>(`/admin/maintenances/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteMaintenance: (id: number) =>
     fetchAPI<void>(`/admin/maintenances/${id}`, { method: 'DELETE' }),
@@ -423,8 +430,10 @@ export interface Maintenance {
   id: number;
   name: string;
   status: 'scheduled' | 'in_progress' | 'completed';
+  // Main component; components lists every covered one, main included
   component_id: number;
   component?: Component;
+  components?: { component_id: number }[];
   start_at: string;
   end_at: string;
   translations?: Translation[];

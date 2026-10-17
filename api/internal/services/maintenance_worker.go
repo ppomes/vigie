@@ -116,7 +116,7 @@ func (m *MaintenanceWorker) updateMaintenanceStatuses() {
 				return err
 			}
 			maintenance.Status = models.MaintenanceCompleted
-			return LeaveMaintenance(tx, maintenance, maintenance.ComponentID)
+			return LeaveMaintenance(tx, maintenance)
 		})
 		if err != nil {
 			log.Printf("Maintenance worker: Error completing maintenance %d: %v", maintenance.ID, err)

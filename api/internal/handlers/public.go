@@ -107,6 +107,13 @@ func publicComponents(db *gorm.DB) *gorm.DB {
 		Where("group_id IS NULL OR group_id IN (?)", publicGroupIDs(db.Session(&gorm.Session{NewDB: true})))
 }
 
+// publicAffectedComponents restricts the preloaded components of an incident
+// or a maintenance to the ones the public page shows, in order.
+func publicAffectedComponents(db *gorm.DB) *gorm.DB {
+	ids := publicComponents(db.Session(&gorm.Session{NewDB: true}).Model(&models.Component{}).Select("id"))
+	return db.Where("component_id IN (?)", ids).Order("id")
+}
+
 // enabledComponents restricts a preloaded group's components to enabled ones.
 func enabledComponents(db *gorm.DB) *gorm.DB {
 	return models.ByDisplayOrder(db).Where("enabled = ?", true)
@@ -169,10 +176,13 @@ func GetIncidents(db *gorm.DB) gin.HandlerFunc {
 		// Build query with translations and component relationship
 		// The timeline is public; the authors' accounts are not loaded.
 		query := db.Preload("Translations", "locale = ?", locale).
-			Preload("Component").
+			Preload("Component", publicComponents).
 			Preload("Component.Translations", "locale = ?", locale).
 			Preload("Updates", updatesNewestFirst).
-			Preload("Updates.Translations", "locale = ?", locale)
+			Preload("Updates.Translations", "locale = ?", locale).
+			Preload("Components", publicAffectedComponents).
+			Preload("Components.Component").
+			Preload("Components.Component.Translations", "locale = ?", locale)
 
 		// Apply status filter if provided
 		if statusFilter != "" {

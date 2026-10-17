@@ -293,6 +293,8 @@ interface IncidentForm {
   component_id: number;
   // Empty means "leave the component status as it is"
   component_status: string;
+  // Other affected components, besides component_id
+  extra_component_ids: number[];
   visible: boolean;
   stickied: boolean;
   // datetime-local value; empty means "now" on creation
@@ -309,6 +311,7 @@ const defaultIncidentForm: IncidentForm = {
   status: 'investigating',
   component_id: 0,
   component_status: '',
+  extra_component_ids: [],
   visible: true,
   stickied: false,
   occurred_at: '',
@@ -318,6 +321,32 @@ const defaultIncidentForm: IncidentForm = {
   message_en: '',
   message_fr: '',
 };
+
+// Checkboxes for the components an incident or maintenance also affects,
+// besides its main component.
+function ExtraComponentsPicker({ components, mainId, value, onChange }: {
+  components: Component[];
+  mainId: number;
+  value: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const others = components.filter(c => c.id !== mainId);
+  if (others.length === 0) return null;
+  const toggle = (id: number) => onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Also affects</label>
+      <div className="flex flex-wrap gap-3">
+        {others.map(c => (
+          <label key={c.id} className="flex items-center gap-1 text-sm">
+            <input type="checkbox" checked={value.includes(c.id)} onChange={() => toggle(c.id)} />
+            {c.name}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // The incident form only changes the component status when asked to.
 function ComponentStatusSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -435,6 +464,15 @@ function toLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// The affected components of an incident form: the main component first,
+// with the chosen status, then the others, whose status is left unchanged.
+function affectedComponents(form: IncidentForm) {
+  return [
+    { component_id: form.component_id, status: form.component_status || undefined },
+    ...form.extra_component_ids.filter(id => id !== form.component_id).map(id => ({ component_id: id })),
+  ];
+}
+
 // Optional incident fields, as sent to the API. notify only applies on creation.
 function incidentOptions(form: IncidentForm, creating: boolean) {
   return {
@@ -548,6 +586,7 @@ function IncidentsPage() {
           status: selectedTemplate?.default_status || 'investigating',
           component_id: form.component_id,
           component_status: form.component_status || undefined,
+          components: affectedComponents(form),
           ...incidentOptions(form, !editId),
           translations: [
             { locale: 'en', field: 'name', value: preview.name_en },
@@ -562,6 +601,7 @@ function IncidentsPage() {
           status: form.status,
           component_id: form.component_id,
           component_status: form.component_status || undefined,
+          components: affectedComponents(form),
           ...incidentOptions(form, !editId),
           translations: buildTranslations(),
         };
@@ -594,6 +634,7 @@ function IncidentsPage() {
       status: i.status,
       component_id: i.component_id,
       component_status: '',
+      extra_component_ids: (i.components || []).map(ac => ac.component_id).filter(id => id !== i.component_id),
       visible: i.visible,
       stickied: i.stickied,
       occurred_at: i.occurred_at ? toLocalInput(i.occurred_at) : '',
@@ -687,6 +728,8 @@ function IncidentsPage() {
               </div>
 
               <ComponentStatusSelect value={form.component_status} onChange={v => setForm({...form, component_status: v})} />
+              <ExtraComponentsPicker components={components} mainId={form.component_id} value={form.extra_component_ids}
+                onChange={ids => setForm({...form, extra_component_ids: ids})} />
               <IncidentOptionsFields form={form} setForm={setForm} creating={!editId} />
 
               {/* Variable inputs */}
@@ -792,6 +835,8 @@ function IncidentsPage() {
               </div>
 
               <ComponentStatusSelect value={form.component_status} onChange={v => setForm({...form, component_status: v})} />
+              <ExtraComponentsPicker components={components} mainId={form.component_id} value={form.extra_component_ids}
+                onChange={ids => setForm({...form, extra_component_ids: ids})} />
               <IncidentOptionsFields form={form} setForm={setForm} creating={!editId} />
 
               <div className="border-t pt-4">
@@ -1901,6 +1946,7 @@ function MaintenancesPage() {
     name: string;
     status: 'scheduled' | 'in_progress' | 'completed';
     component_id: number;
+    extra_component_ids: number[];
     start_at: string;
     end_at: string;
     name_en: string;
@@ -1913,6 +1959,7 @@ function MaintenancesPage() {
     name: '',
     status: 'scheduled',
     component_id: 0,
+    extra_component_ids: [],
     start_at: '',
     end_at: '',
     name_en: '',
@@ -1946,6 +1993,7 @@ function MaintenancesPage() {
       name: '',
       status: 'scheduled',
       component_id: components.length > 0 ? components[0].id : 0,
+      extra_component_ids: [],
       start_at: '',
       end_at: '',
       name_en: '',
@@ -2010,6 +2058,7 @@ function MaintenancesPage() {
       name,
       status: form.status,
       component_id: form.component_id,
+      component_ids: form.extra_component_ids.filter(id => id !== form.component_id),
       start_at: form.start_at,
       end_at: form.end_at,
       translations: buildTranslations(),
@@ -2036,6 +2085,7 @@ function MaintenancesPage() {
       name: m.name,
       status: m.status,
       component_id: m.component_id,
+      extra_component_ids: (m.components || []).map(mc => mc.component_id).filter(id => id !== m.component_id),
       start_at: m.start_at.slice(0, 16),
       end_at: m.end_at.slice(0, 16),
       name_en: getTranslation('name', 'en'),
@@ -2207,6 +2257,10 @@ function MaintenancesPage() {
               >
                 {components.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              <div className="mt-2">
+                <ExtraComponentsPicker components={components} mainId={form.component_id} value={form.extra_component_ids}
+                  onChange={ids => setForm({ ...form, extra_component_ids: ids })} />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>

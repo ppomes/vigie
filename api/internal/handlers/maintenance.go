@@ -36,7 +36,11 @@ func getTranslationValue(translations []models.Translation, field, locale, defau
 type CreateMaintenanceRequest struct {
 	Name         string               `json:"name" binding:"required"`
 	Status       string               `json:"status" binding:"omitempty,oneof=scheduled in_progress completed"`
-	ComponentID  uint                 `json:"component_id" binding:"required"`
+	// ComponentID is the main covered component. It may be omitted when
+	// ComponentIDs is given; the first one is then the main component.
+	ComponentID  uint                 `json:"component_id"`
+	// ComponentIDs lists more covered components.
+	ComponentIDs []uint               `json:"component_ids"`
 	StartAt      time.Time            `json:"start_at" binding:"required"`
 	EndAt        time.Time            `json:"end_at" binding:"required"`
 	Translations []TranslationRequest `json:"translations"`
@@ -47,6 +51,9 @@ type UpdateMaintenanceRequest struct {
 	Name         string               `json:"name"`
 	Status       string               `json:"status" binding:"omitempty,oneof=scheduled in_progress completed"`
 	ComponentID  *uint                `json:"component_id"`
+	// ComponentIDs, when given, replaces the covered components, together
+	// with ComponentID (or the current main component).
+	ComponentIDs *[]uint              `json:"component_ids"`
 	StartAt      *time.Time           `json:"start_at"`
 	EndAt        *time.Time           `json:"end_at"`
 	Translations []TranslationRequest `json:"translations"`
@@ -57,7 +64,7 @@ type UpdateMaintenanceRequest struct {
 func ListMaintenances(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var maintenances []models.Maintenance
-		if err := db.Preload("Translations").Preload("Component").
+		if err := db.Preload("Translations").Preload("Component").Preload("Components").
 			Order("start_at DESC").Find(&maintenances).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch maintenances"})
 			return
@@ -86,14 +93,8 @@ func CreateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 			return
 		}
 
-		// Verify component exists
-		var component models.Component
-		if err := db.First(&component, req.ComponentID).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Component not found"})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify component"})
+		componentIDs, ok := componentSet(c, db, req.ComponentID, req.ComponentIDs)
+		if !ok {
 			return
 		}
 
@@ -107,7 +108,7 @@ func CreateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 		maintenance := models.Maintenance{
 			Name:        req.Name,
 			Status:      status,
-			ComponentID: req.ComponentID,
+			ComponentID: componentIDs[0],
 			StartAt:     req.StartAt,
 			EndAt:       req.EndAt,
 		}
@@ -138,7 +139,13 @@ func CreateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 			}
 		}
 
-		// Put the component under maintenance if it starts right away
+		if _, _, err := replaceMaintenanceComponents(tx, maintenance.ID, componentIDs); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save maintenance components"})
+			return
+		}
+
+		// Put the components under maintenance if it starts right away
 		if status == models.MaintenanceInProgress {
 			if err := services.EnterMaintenance(tx, &maintenance); err != nil {
 				tx.Rollback()
@@ -153,8 +160,8 @@ func CreateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 			return
 		}
 
-		// Reload maintenance with translations and component
-		db.Preload("Translations").Preload("Component").First(&maintenance, maintenance.ID)
+		// Reload maintenance with translations and components
+		db.Preload("Translations").Preload("Component").Preload("Components").First(&maintenance, maintenance.ID)
 
 		// Send notifications to subscribers (async, non-blocking)
 		if notificationService != nil {
@@ -199,7 +206,6 @@ func UpdateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 			return
 		}
 
-		oldComponentID := maintenance.ComponentID
 		oldStatus := maintenance.Status
 
 		// Start transaction
@@ -212,18 +218,28 @@ func UpdateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 		if req.Status != "" {
 			maintenance.Status = req.Status
 		}
-		if req.ComponentID != nil {
-			var component models.Component
-			if err := tx.First(&component, *req.ComponentID).Error; err != nil {
-				tx.Rollback()
-				if err == gorm.ErrRecordNotFound {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "Component not found"})
-					return
+		// The covered components after this update, when they change. Moving
+		// the main component without a list replaces the set with it.
+		var componentIDs []uint
+		if req.ComponentID != nil || req.ComponentIDs != nil {
+			main := maintenance.ComponentID
+			if req.ComponentID != nil {
+				main = *req.ComponentID
+			}
+			var extra []uint
+			if req.ComponentIDs != nil {
+				extra = *req.ComponentIDs
+				if req.ComponentID == nil && !idSet(extra)[main] {
+					main = 0
 				}
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify component"})
+			}
+			var ok bool
+			componentIDs, ok = componentSet(c, tx, main, extra)
+			if !ok {
+				tx.Rollback()
 				return
 			}
-			maintenance.ComponentID = *req.ComponentID
+			maintenance.ComponentID = componentIDs[0]
 		}
 		if req.StartAt != nil {
 			maintenance.StartAt = *req.StartAt
@@ -274,25 +290,12 @@ func UpdateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 		}
 
 		// Move component statuses in and out of maintenance. Only the
-		// transitions matter: an unchanged in-progress maintenance leaves the
-		// component alone, so a status set meanwhile is kept.
-		wasActive := oldStatus == models.MaintenanceInProgress
-		isActive := maintenance.Status == models.MaintenanceInProgress
-		componentChanged := oldComponentID != maintenance.ComponentID
-
-		if wasActive && (!isActive || componentChanged) {
-			if err := services.LeaveMaintenance(tx, &maintenance, oldComponentID); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore component status"})
-				return
-			}
-		}
-		if isActive && (!wasActive || componentChanged) {
-			if err := services.EnterMaintenance(tx, &maintenance); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
-				return
-			}
+		// transitions matter: components that stay under an in-progress
+		// maintenance are left alone, so a status set meanwhile is kept.
+		if err := transitionMaintenance(tx, &maintenance, oldStatus, componentIDs); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component statuses"})
+			return
 		}
 
 		// Commit transaction
@@ -340,8 +343,6 @@ func DeleteMaintenance(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		componentID := maintenance.ComponentID
-
 		// Start transaction
 		tx := db.Begin()
 
@@ -362,11 +363,16 @@ func DeleteMaintenance(db *gorm.DB) gin.HandlerFunc {
 
 		// Deleting a maintenance in progress ends it
 		if maintenance.Status == models.MaintenanceInProgress {
-			if err := services.LeaveMaintenance(tx, &maintenance, componentID); err != nil {
+			if err := services.LeaveMaintenance(tx, &maintenance); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore component status"})
 				return
 			}
+		}
+		if err := tx.Where("maintenance_id = ?", maintenance.ID).Delete(&models.MaintenanceComponent{}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete maintenance components"})
+			return
 		}
 
 		// Commit transaction
@@ -390,7 +396,10 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 
 		// Get active (in_progress) and upcoming (scheduled) maintenances
 		var maintenances []models.Maintenance
-		if err := db.Preload("Translations").Preload("Component").
+		if err := db.Preload("Translations").
+			Preload("Component", publicComponents).Preload("Component.Translations", "locale = ?", locale).
+			Preload("Components", publicAffectedComponents).
+			Preload("Components.Component").Preload("Components.Component.Translations", "locale = ?", locale).
 			Where("status IN (?, ?) AND end_at > ?",
 				models.MaintenanceScheduled, models.MaintenanceInProgress, now).
 			Order("start_at ASC").
@@ -407,6 +416,8 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 			Status      string    `json:"status"`
 			ComponentID uint      `json:"component_id"`
 			Component   string    `json:"component"`
+			// Components names every covered component, main one first.
+			Components []string  `json:"components"`
 			StartAt     time.Time `json:"start_at"`
 			EndAt       time.Time `json:"end_at"`
 		}
@@ -415,9 +426,15 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 		for _, m := range maintenances {
 			name := getTranslationValue(m.Translations, "name", locale, m.Name)
 			message := getTranslationValue(m.Translations, "message", locale, "")
-			componentName := m.Component.Name
-			if len(m.Component.Translations) > 0 {
-				componentName = getTranslationValue(m.Component.Translations, "name", locale, componentName)
+			componentName := getTranslationValue(m.Component.Translations, "name", locale, m.Component.Name)
+			names := []string{}
+			for _, mc := range m.Components {
+				if mc.Component != nil {
+					names = append(names, getTranslationValue(mc.Component.Translations, "name", locale, mc.Component.Name))
+				}
+			}
+			if len(names) == 0 && componentName != "" {
+				names = []string{componentName}
 			}
 
 			response = append(response, MaintenanceResponse{
@@ -427,6 +444,7 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 				Status:      m.Status,
 				ComponentID: m.ComponentID,
 				Component:   componentName,
+				Components:  names,
 				StartAt:     m.StartAt,
 				EndAt:       m.EndAt,
 			})
@@ -436,4 +454,41 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 			"maintenances": response,
 		})
 	}
+}
+
+// transitionMaintenance applies a maintenance update to component statuses.
+// componentIDs is the new set of covered components, or nil when unchanged.
+//
+//   - ending (in progress, then not): every component is restored;
+//   - still in progress with a new set: removed components are restored,
+//     added ones are put under maintenance;
+//   - starting: every component is put under maintenance.
+func transitionMaintenance(tx *gorm.DB, m *models.Maintenance, oldStatus string, componentIDs []uint) error {
+	wasActive := oldStatus == models.MaintenanceInProgress
+	isActive := m.Status == models.MaintenanceInProgress
+
+	if wasActive && !isActive {
+		if err := services.LeaveMaintenance(tx, m); err != nil {
+			return err
+		}
+	}
+
+	var added, removed []models.MaintenanceComponent
+	if componentIDs != nil {
+		var err error
+		if added, removed, err = replaceMaintenanceComponents(tx, m.ID, componentIDs); err != nil {
+			return err
+		}
+	}
+
+	switch {
+	case wasActive && isActive:
+		if err := services.LeaveMaintenanceComponents(tx, m, removed); err != nil {
+			return err
+		}
+		return services.EnterMaintenanceComponents(tx, m, added)
+	case !wasActive && isActive:
+		return services.EnterMaintenance(tx, m)
+	}
+	return nil
 }

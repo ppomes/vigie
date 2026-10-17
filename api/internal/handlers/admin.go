@@ -42,8 +42,13 @@ type UpdateComponentRequest struct {
 type CreateIncidentRequest struct {
 	Name         string                    `json:"name" binding:"required"`
 	Status       string                    `json:"status" binding:"required,oneof=investigating identified monitoring resolved"`
-	ComponentID  uint                      `json:"component_id" binding:"required"`
-	// ComponentStatus, when set, changes the status of the affected
+	// ComponentID is the main affected component. It may be omitted when
+	// Components is given; the first one is then the main component.
+	ComponentID  uint                      `json:"component_id"`
+	// Components lists every affected component, each with an optional
+	// status to set. When omitted, the incident affects ComponentID only.
+	Components   []AffectedComponentRequest `json:"components" binding:"omitempty,dive"`
+	// ComponentStatus, when set, changes the status of the main
 	// component. When empty, the component status is left as it is.
 	ComponentStatus string                 `json:"component_status" binding:"omitempty,oneof=operational degraded_performance partial_outage major_outage"`
 	incidentExtras
@@ -115,7 +120,10 @@ type UpdateIncidentRequest struct {
 	Name         string                    `json:"name"`
 	Status       string                    `json:"status" binding:"omitempty,oneof=investigating identified monitoring resolved"`
 	ComponentID  *uint                     `json:"component_id"`
-	// ComponentStatus, when set, changes the status of the affected
+	// Components, when given, replaces the affected components, each with
+	// an optional status to set.
+	Components   *[]AffectedComponentRequest `json:"components" binding:"omitempty,dive"`
+	// ComponentStatus, when set, changes the status of the main
 	// component. When empty, the component status is left as it is.
 	ComponentStatus string                 `json:"component_status" binding:"omitempty,oneof=operational degraded_performance partial_outage major_outage"`
 	incidentExtras
@@ -376,14 +384,8 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			return
 		}
 
-		// Verify component exists
-		var component models.Component
-		if err := db.First(&component, req.ComponentID).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Component not found"})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify component"})
+		affected, ok := incidentComponents(c, db, req.ComponentID, req.Components, req.ComponentStatus)
+		if !ok {
 			return
 		}
 
@@ -394,7 +396,7 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		incident := models.Incident{
 			Name:        req.Name,
 			Status:      req.Status,
-			ComponentID: req.ComponentID,
+			ComponentID: affected[0].ComponentID,
 			OccurredAt:  &now,
 		}
 		if user, _ := services.GetCurrentUser(c); user != nil {
@@ -427,13 +429,12 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			}
 		}
 
-		// Change the component status only when the request asks for it
-		if req.ComponentStatus != "" {
-			if err := services.SetComponentStatus(tx, incident.ComponentID, req.ComponentStatus); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
-				return
-			}
+		// Record the affected components, and change their status only when
+		// the request asks for it
+		if err := applyIncidentComponents(tx, incident.ID, affected); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update components"})
+			return
 		}
 
 		extras := map[string]any{}
@@ -460,7 +461,7 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		}
 
 		// Reload incident with translations and component
-		db.Preload("Translations").Preload("Component").First(&incident, incident.ID)
+		db.Preload("Translations").Preload("Component").Preload("Components").First(&incident, incident.ID)
 
 		// Send notifications to subscribers (async, non-blocking), unless
 		// asked not to, or the incident is internal.
@@ -517,19 +518,37 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		if req.Status != "" {
 			incident.Status = req.Status
 		}
-		if req.ComponentID != nil {
-			// Verify component exists
-			var component models.Component
-			if err := tx.First(&component, *req.ComponentID).Error; err != nil {
-				tx.Rollback()
-				if err == gorm.ErrRecordNotFound {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "Component not found"})
-					return
+		// Work out the affected components after this update. Moving the
+		// main component without a list replaces the set with it.
+		var affected []AffectedComponentRequest
+		switch {
+		case req.Components != nil || req.ComponentID != nil:
+			main := incident.ComponentID
+			if req.ComponentID != nil {
+				main = *req.ComponentID
+			}
+			var list []AffectedComponentRequest
+			if req.Components != nil {
+				list = *req.Components
+				if req.ComponentID == nil && !containsComponent(list, main) {
+					main = 0
 				}
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify component"})
+			}
+			var ok bool
+			affected, ok = incidentComponents(c, tx, main, list, req.ComponentStatus)
+			if !ok {
+				tx.Rollback()
 				return
 			}
-			incident.ComponentID = *req.ComponentID
+			incident.ComponentID = affected[0].ComponentID
+		case req.ComponentStatus != "":
+			current, err := currentIncidentComponents(tx, incident.ID)
+			if err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch components"})
+				return
+			}
+			affected = withMainStatus(current, incident.ComponentID, req.ComponentStatus)
 		}
 
 		if err := tx.Save(&incident).Error; err != nil {
@@ -564,12 +583,12 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 			}
 		}
 
-		// Change the component status only when the request asks for it.
-		// Moving an incident to another component leaves both statuses alone.
-		if req.ComponentStatus != "" {
-			if err := services.SetComponentStatus(tx, incident.ComponentID, req.ComponentStatus); err != nil {
+		// Change component statuses only when the request asks for it.
+		// Components removed from the incident keep their status.
+		if affected != nil {
+			if err := applyIncidentComponents(tx, incident.ID, affected); err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update component status"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update components"})
 				return
 			}
 		}
@@ -587,7 +606,7 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		}
 
 		// Reload incident with translations and component
-		db.Preload("Translations").Preload("Component").First(&incident, incident.ID)
+		db.Preload("Translations").Preload("Component").Preload("Components").First(&incident, incident.ID)
 
 		// Send notifications to subscribers (async, non-blocking)
 		if notificationService != nil && incident.Notifications && incident.Visible {
@@ -630,7 +649,12 @@ func DeleteIncident(db *gorm.DB) gin.HandlerFunc {
 		// Start transaction
 		tx := db.Begin()
 
-		// Remove the timeline with the incident
+		// Remove the timeline and the affected components with the incident
+		if err := tx.Where("incident_id = ?", incident.ID).Delete(&models.IncidentComponent{}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete incident components"})
+			return
+		}
 		if err := deleteIncidentUpdates(tx, incident.ID); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete incident updates"})
@@ -661,7 +685,7 @@ func DeleteIncident(db *gorm.DB) gin.HandlerFunc {
 func ListIncidents(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var incidents []models.Incident
-		if err := db.Preload("Translations").Preload("Component").
+		if err := db.Preload("Translations").Preload("Component").Preload("Components").
 			Preload("Updates", updatesNewestFirst).Preload("Updates.Translations").Preload("Updates.User").
 			Order("created_at DESC").Find(&incidents).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch incidents"})

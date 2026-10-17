@@ -18,6 +18,9 @@ func createMaintenance(t *testing.T, db *gorm.DB, componentID uint, status strin
 	if err := db.Create(&m).Error; err != nil {
 		t.Fatalf("create maintenance: %v", err)
 	}
+	if err := db.Create(&models.MaintenanceComponent{MaintenanceID: m.ID, ComponentID: componentID}).Error; err != nil {
+		t.Fatalf("create maintenance component: %v", err)
+	}
 	return m
 }
 
@@ -39,7 +42,7 @@ func TestMaintenanceRestoresPreviousStatus(t *testing.T) {
 		t.Fatalf("during maintenance: got %q, want %q", got, ComponentUnderMaintenance)
 	}
 
-	inTx(t, db, func(tx *gorm.DB) error { return LeaveMaintenance(tx, &m, c.ID) })
+	inTx(t, db, func(tx *gorm.DB) error { return LeaveMaintenance(tx, &m) })
 	if got := testutil.ComponentStatus(t, db, c.ID); got != ComponentPartialOutage {
 		t.Fatalf("after maintenance: got %q, want the previous status %q", got, ComponentPartialOutage)
 	}
@@ -54,7 +57,7 @@ func TestMaintenanceKeepsStatusSetDuringMaintenance(t *testing.T) {
 	inTx(t, db, func(tx *gorm.DB) error { return EnterMaintenance(tx, &m) })
 	// A monitoring tool reports an outage while the maintenance runs.
 	inTx(t, db, func(tx *gorm.DB) error { return SetComponentStatus(tx, c.ID, ComponentMajorOutage) })
-	inTx(t, db, func(tx *gorm.DB) error { return LeaveMaintenance(tx, &m, c.ID) })
+	inTx(t, db, func(tx *gorm.DB) error { return LeaveMaintenance(tx, &m) })
 
 	if got := testutil.ComponentStatus(t, db, c.ID); got != ComponentMajorOutage {
 		t.Fatalf("got %q, want the explicitly set %q", got, ComponentMajorOutage)
@@ -77,7 +80,7 @@ func TestOverlappingMaintenancesRestoreOriginalStatus(t *testing.T) {
 					if err := tx.Model(m).Update("status", models.MaintenanceCompleted).Error; err != nil {
 						return err
 					}
-					return LeaveMaintenance(tx, m, c.ID)
+					return LeaveMaintenance(tx, m)
 				})
 			}
 			a, b := &m1, &m2
@@ -218,5 +221,39 @@ func TestIncidentUpdateNotificationUsesUpdateMessage(t *testing.T) {
 	db.First(&q)
 	if q.Subject != "[monitoring] Slow API" || !strings.Contains(q.Body, "Correctif déployé") {
 		t.Fatalf("subject %q, body %q", q.Subject, q.Body)
+	}
+}
+
+func TestStatusSetBetweenOverlappingMaintenancesIsRestored(t *testing.T) {
+	for _, firstToEnd := range []string{"first", "second"} {
+		t.Run(firstToEnd+" ends first", func(t *testing.T) {
+			db := testutil.NewDB(t)
+			c := testutil.CreateComponent(t, db, "DB", ComponentOperational)
+			now := time.Now()
+			m1 := createMaintenance(t, db, c.ID, models.MaintenanceInProgress, now, now.Add(time.Hour))
+			inTx(t, db, func(tx *gorm.DB) error { return EnterMaintenance(tx, &m1) })
+			// A monitoring tool reports an outage, then a second maintenance starts.
+			inTx(t, db, func(tx *gorm.DB) error { return SetComponentStatus(tx, c.ID, ComponentMajorOutage) })
+			m2 := createMaintenance(t, db, c.ID, models.MaintenanceInProgress, now, now.Add(2*time.Hour))
+			inTx(t, db, func(tx *gorm.DB) error { return EnterMaintenance(tx, &m2) })
+
+			end := func(m *models.Maintenance) {
+				inTx(t, db, func(tx *gorm.DB) error {
+					if err := tx.Model(m).Update("status", models.MaintenanceCompleted).Error; err != nil {
+						return err
+					}
+					return LeaveMaintenance(tx, m)
+				})
+			}
+			a, b := &m1, &m2
+			if firstToEnd == "second" {
+				a, b = &m2, &m1
+			}
+			end(a)
+			end(b)
+			if got := testutil.ComponentStatus(t, db, c.ID); got != ComponentMajorOutage {
+				t.Fatalf("both ended: got %q, want the explicitly set %q", got, ComponentMajorOutage)
+			}
+		})
 	}
 }
