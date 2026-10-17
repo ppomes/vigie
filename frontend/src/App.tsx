@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getComponents, getIncidents, getMaintenances, getStatus, subscribe, Component, Incident, Maintenance, SystemStatus } from './lib/api';
+import { getComponents, getComponentGroups, getIncidents, getMaintenances, getStatus, subscribe, Component, ComponentGroup, Incident, Maintenance, SystemStatus } from './lib/api';
 import { useTheme } from './themes/ThemeContext';
 import { useBranding } from './themes/BrandingContext';
 
@@ -71,15 +71,102 @@ function StatusBanner({ centered = false }: { centered?: boolean }) {
   );
 }
 
+// Worst status first, to summarise a collapsed group.
+const statusSeverity: Record<string, number> = {
+  major_outage: 4,
+  partial_outage: 3,
+  degraded_performance: 2,
+  under_maintenance: 1,
+  operational: 0,
+};
+
+function worstStatus(components: Component[]): Component['status'] {
+  return components.reduce<Component['status']>(
+    (worst, c) => ((statusSeverity[c.status] ?? 0) > (statusSeverity[worst] ?? 0) ? c.status : worst),
+    'operational',
+  );
+}
+
+function groupName(group: ComponentGroup, locale: string): string {
+  return group.translations?.find(t => t.field === 'name' && t.locale === locale)?.value || group.name;
+}
+
+function initiallyCollapsed(group: ComponentGroup): boolean {
+  if (group.collapse === 'always') return true;
+  if (group.collapse === 'operational') return (group.components || []).every(c => c.status === 'operational');
+  return false;
+}
+
+// A component's name in the reader's language, falling back to its name.
+function componentName(component: Component, locale: string): string {
+  return component.translations?.find(tr => tr.field === 'name' && tr.locale === locale)?.value || component.name;
+}
+
+function ComponentRow({ component, asSidebar }: { component: Component; asSidebar: boolean }) {
+  const { t, i18n } = useTranslation();
+  const name = componentName(component, i18n.language);
+  if (asSidebar) {
+    return (
+      <div className="flex items-center gap-2 py-2">
+        <div className={`w-2 h-2 rounded-full ${statusClasses[component.status]}`} />
+        <span className="text-sm">{name}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center justify-between py-3 border-b last:border-0" style={{ borderColor: 'var(--color-card-border)' }}>
+      <div className="flex items-center gap-3">
+        <div className={`w-3 h-3 rounded-full ${statusClasses[component.status]}`} />
+        <span className="font-medium">{name}</span>
+      </div>
+      <span className="text-sm text-muted">{t(`componentStatus.${component.status}`)}</span>
+    </div>
+  );
+}
+
+function GroupBlock({ group, asSidebar }: { group: ComponentGroup; asSidebar: boolean }) {
+  const { t, i18n } = useTranslation();
+  const components = group.components || [];
+  const [collapsed, setCollapsed] = useState(() => initiallyCollapsed(group));
+  const worst = worstStatus(components);
+
+  return (
+    <div className={asSidebar ? 'mt-3' : 'mt-4'}>
+      <button
+        type="button"
+        onClick={() => setCollapsed(!collapsed)}
+        aria-expanded={!collapsed}
+        className="w-full flex items-center justify-between py-2 text-left"
+      >
+        <span className="flex items-center gap-2">
+          <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+          <span className={asSidebar ? 'text-sm font-semibold' : 'font-semibold'}>{groupName(group, i18n.language)}</span>
+        </span>
+        {collapsed && !asSidebar && <span className="text-sm text-muted">{t(`componentStatus.${worst}`)}</span>}
+        {collapsed && asSidebar && <span className={`w-2 h-2 rounded-full ${statusClasses[worst]}`} />}
+      </button>
+      {!collapsed && (
+        <div className={asSidebar ? 'pl-4' : 'pl-6'}>
+          {components.map(c => <ComponentRow key={c.id} component={c} asSidebar={asSidebar} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ComponentsList({ asSidebar = false }: { asSidebar?: boolean }) {
   const { t, i18n } = useTranslation();
   const [components, setComponents] = useState<Component[]>([]);
+  const [groups, setGroups] = useState<ComponentGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getComponents(i18n.language)
-      .then(setComponents)
+    Promise.all([getComponents(i18n.language), getComponentGroups(i18n.language)])
+      .then(([c, g]) => {
+        setComponents(c);
+        setGroups(g);
+      })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [i18n.language]);
@@ -88,30 +175,14 @@ function ComponentsList({ asSidebar = false }: { asSidebar?: boolean }) {
   if (error) return <p className="text-red-600">{error}</p>;
   if (components.length === 0) return <p className="text-muted">{t('components.noComponents')}</p>;
 
-  if (asSidebar) {
-    return (
-      <div className="space-y-2">
-        {components.map(component => (
-          <div key={component.id} className="flex items-center gap-2 py-2">
-            <div className={`w-2 h-2 rounded-full ${statusClasses[component.status]}`} />
-            <span className="text-sm">{component.name}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
+  // Components outside any group come first, then each group in order.
+  const ungrouped = components.filter(c => !c.group_id);
+  const visibleGroups = groups.filter(g => (g.components || []).length > 0);
 
   return (
-    <div className="space-y-3">
-      {components.map(component => (
-        <div key={component.id} className="flex items-center justify-between py-3 border-b last:border-0" style={{ borderColor: 'var(--color-card-border)' }}>
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${statusClasses[component.status]}`} />
-            <span className="font-medium">{component.name}</span>
-          </div>
-          <span className="text-sm text-muted">{t(`componentStatus.${component.status}`)}</span>
-        </div>
-      ))}
+    <div className={asSidebar ? 'space-y-2' : 'space-y-3'}>
+      {ungrouped.map(c => <ComponentRow key={c.id} component={c} asSidebar={asSidebar} />)}
+      {visibleGroups.map(g => <GroupBlock key={g.id} group={g} asSidebar={asSidebar} />)}
     </div>
   );
 }

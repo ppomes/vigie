@@ -78,10 +78,11 @@ func GetComponents(db *gorm.DB) gin.HandlerFunc {
 		// Get locale from query param or Accept-Language header (default: en)
 		locale := getLocale(c)
 
-		// Fetch all components with translations, ordered by display order
+		// Fetch components with translations, ordered by display order.
+		// Components in a group hidden from the public are left out.
 		var components []models.Component
-		if err := db.Preload("Translations", "locale = ?", locale).
-			Order("\"order\" ASC, id ASC").
+		if err := models.ByDisplayOrder(db).Preload("Translations", "locale = ?", locale).
+			Where("group_id IS NULL OR group_id IN (?)", publicGroupIDs(db)).
 			Find(&components).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch components"})
 			return
@@ -90,6 +91,36 @@ func GetComponents(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"components": components,
 			"locale":     locale,
+		})
+	}
+}
+
+// publicGroupIDs is a subquery selecting the groups shown on the public page.
+func publicGroupIDs(db *gorm.DB) *gorm.DB {
+	return db.Model(&models.ComponentGroup{}).Select("id").Where("visibility = ?", models.GroupVisibilityPublic)
+}
+
+// GetComponentGroups returns the groups shown on the public page, in order,
+// with their components and translations in the requested locale.
+// GET /api/v1/component-groups
+func GetComponentGroups(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		locale := getLocale(c)
+
+		var groups []models.ComponentGroup
+		if err := models.ByDisplayOrder(db).
+			Where("visibility = ?", models.GroupVisibilityPublic).
+			Preload("Translations", "locale = ?", locale).
+			Preload("Components", models.ByDisplayOrder).
+			Preload("Components.Translations", "locale = ?", locale).
+			Find(&groups).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch component groups"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"component_groups": groups,
+			"locale":           locale,
 		})
 	}
 }

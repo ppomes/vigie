@@ -48,6 +48,7 @@ func main() {
 		&models.AuditLog{},
 		&models.APIKey{},
 		&models.IncidentUpdate{},
+		&models.ComponentGroup{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -99,6 +100,7 @@ func main() {
 	{
 		public.GET("/status", handlers.GetStatus(db))
 		public.GET("/components", handlers.GetComponents(db))
+		public.GET("/component-groups", handlers.GetComponentGroups(db))
 		public.GET("/incidents", handlers.GetIncidents(db))
 		public.GET("/maintenances", handlers.GetMaintenances(db))
 
@@ -129,6 +131,7 @@ func main() {
 
 		// Read-only routes (viewers and admins can access)
 		admin.GET("/components", handlers.ListComponents(db))
+		admin.GET("/component-groups", handlers.ListComponentGroups(db))
 		admin.GET("/incidents", handlers.ListIncidents(db))
 		admin.GET("/subscribers", handlers.ListSubscribers(db))
 		admin.GET("/settings", handlers.ListSettings(db))
@@ -149,6 +152,11 @@ func main() {
 			adminOnly.POST("/components", handlers.CreateComponent(db))
 			adminOnly.PUT("/components/:id", handlers.UpdateComponent(db))
 			adminOnly.DELETE("/components/:id", handlers.DeleteComponent(db))
+
+			// Component groups
+			adminOnly.POST("/component-groups", handlers.CreateComponentGroup(db))
+			adminOnly.PUT("/component-groups/:id", handlers.UpdateComponentGroup(db))
+			adminOnly.DELETE("/component-groups/:id", handlers.DeleteComponentGroup(db))
 
 			// Incident management
 			adminOnly.POST("/incidents", handlers.CreateIncident(db, notificationService))

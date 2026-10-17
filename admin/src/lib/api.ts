@@ -89,6 +89,28 @@ export interface Component {
   name: string;
   status: string;
   order: number;
+  group_id?: number | null;
+}
+
+export interface ComponentGroup {
+  id: number;
+  name: string;
+  order: number;
+  // never, always, or operational (collapsed while all components are operational)
+  collapse: 'never' | 'always' | 'operational';
+  // public, or authenticated (hidden from the public page)
+  visibility: 'public' | 'authenticated';
+  translations?: Translation[];
+  components?: Component[];
+}
+
+// Body of a component group create or update. Only "name" translations.
+export interface ComponentGroupInput {
+  name?: string;
+  order?: number;
+  collapse?: ComponentGroup['collapse'];
+  visibility?: ComponentGroup['visibility'];
+  translations?: { locale: string; field: 'name'; value: string }[];
 }
 
 export interface Translation {
@@ -225,6 +247,15 @@ export const api = {
     fetchAPI<Component>(`/admin/components/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteComponent: (id: number) =>
     fetchAPI<void>(`/admin/components/${id}`, { method: 'DELETE' }),
+
+  getComponentGroups: () =>
+    fetchAPI<{ component_groups: ComponentGroup[] }>('/admin/component-groups').then(r => r.component_groups || []),
+  createComponentGroup: (data: ComponentGroupInput) =>
+    fetchAPI<{ component_group: ComponentGroup }>('/admin/component-groups', { method: 'POST', body: JSON.stringify(data) }),
+  updateComponentGroup: (id: number, data: ComponentGroupInput) =>
+    fetchAPI<{ component_group: ComponentGroup }>(`/admin/component-groups/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteComponentGroup: (id: number) =>
+    fetchAPI<void>(`/admin/component-groups/${id}`, { method: 'DELETE' }),
 
   getIncidents: () => fetchAPI<{ incidents: Incident[] }>('/admin/incidents').then(r => r.incidents || []),
   createIncident: (data: IncidentInput) =>

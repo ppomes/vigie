@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext, Fragment } from 'react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey, IncidentUpdateInput } from './lib/api';
+import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey, IncidentUpdateInput, ComponentGroup } from './lib/api';
 
 // User context for role-based access
 interface UserContextType {
@@ -20,19 +20,23 @@ const themes = [
   { id: 'modern', name: 'Modern', description: 'Gradient accents, rounded cards', preview: 'bg-gradient-to-r from-indigo-500 to-purple-500' },
 ];
 
+const emptyComponentForm = { name: '', status: 'operational', order: 0, group_id: 0 };
+
 function ComponentsPage() {
   const [components, setComponents] = useState<Component[]>([]);
+  const [groups, setGroups] = useState<ComponentGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: '', status: 'operational', order: 0 });
+  const [form, setForm] = useState(emptyComponentForm);
 
   useEffect(() => { loadComponents(); }, []);
 
   const loadComponents = async () => {
     try {
-      const data = await api.getComponents();
+      const [data, g] = await Promise.all([api.getComponents(), api.getComponentGroups()]);
       setComponents(data);
+      setGroups(g);
     } finally {
       setLoading(false);
     }
@@ -41,6 +45,7 @@ function ComponentsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // group_id 0 means "no group"
       if (editId) {
         await api.updateComponent(editId, form);
       } else {
@@ -48,7 +53,7 @@ function ComponentsPage() {
       }
       setShowForm(false);
       setEditId(null);
-      setForm({ name: '', status: 'operational', order: 0 });
+      setForm(emptyComponentForm);
       loadComponents();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error saving component');
@@ -56,7 +61,7 @@ function ComponentsPage() {
   };
 
   const handleEdit = (c: Component) => {
-    setForm({ name: c.name, status: c.status, order: c.order });
+    setForm({ name: c.name, status: c.status, order: c.order, group_id: c.group_id || 0 });
     setEditId(c.id);
     setShowForm(true);
   };
@@ -73,7 +78,7 @@ function ComponentsPage() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Components</h2>
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm({ name: '', status: 'operational', order: 0 }); }}
+        <button onClick={() => { setShowForm(true); setEditId(null); setForm(emptyComponentForm); }}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
           Add Component
         </button>
@@ -81,17 +86,21 @@ function ComponentsPage() {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded mb-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <input type="text" placeholder="Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
               className="border rounded px-3 py-2" required />
             <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="border rounded px-3 py-2">
               <option value="operational">Operational</option>
-              <option value="degraded">Degraded</option>
+              <option value="degraded_performance">Degraded performance</option>
               <option value="partial_outage">Partial Outage</option>
               <option value="major_outage">Major Outage</option>
             </select>
-            <input type="number" placeholder="Order" value={form.order} onChange={e => setForm({...form, order: parseInt(e.target.value)})}
+            <input type="number" placeholder="Order" value={form.order} onChange={e => setForm({...form, order: parseInt(e.target.value) || 0})}
               className="border rounded px-3 py-2" />
+            <select value={form.group_id} onChange={e => setForm({...form, group_id: parseInt(e.target.value)})} className="border rounded px-3 py-2">
+              <option value={0}>No group</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
           </div>
           <div className="mt-4 flex gap-2">
             <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
@@ -110,6 +119,7 @@ function ComponentsPage() {
             <th className="border p-2 text-left">Name</th>
             <th className="border p-2 text-left">Status</th>
             <th className="border p-2 text-left">Order</th>
+            <th className="border p-2 text-left">Group</th>
             <th className="border p-2 text-left">Actions</th>
           </tr>
         </thead>
@@ -119,12 +129,142 @@ function ComponentsPage() {
               <td className="border p-2">{c.name}</td>
               <td className="border p-2">{c.status}</td>
               <td className="border p-2">{c.order}</td>
+              <td className="border p-2">{groups.find(g => g.id === c.group_id)?.name || '-'}</td>
               <td className="border p-2">
                 <button onClick={() => handleEdit(c)} className="text-blue-500 mr-2">Edit</button>
                 <button onClick={() => handleDelete(c.id)} className="text-red-500">Delete</button>
               </td>
             </tr>
           ))}
+        </tbody>
+      </table>
+
+      <ComponentGroupsSection groups={groups} onChange={loadComponents} />
+    </div>
+  );
+}
+
+const emptyGroupForm = { name: '', name_en: '', name_fr: '', order: 0, collapse: 'never' as ComponentGroup['collapse'], visibility: 'public' as ComponentGroup['visibility'] };
+
+// Component groups: create, edit, delete. Deleting a group keeps its
+// components, ungrouped.
+function ComponentGroupsSection({ groups, onChange }: { groups: ComponentGroup[]; onChange: () => void }) {
+  const [editId, setEditId] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyGroupForm);
+
+  const translation = (g: ComponentGroup, locale: string) =>
+    g.translations?.find(t => t.field === 'name' && t.locale === locale)?.value || '';
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const translations: { locale: string; field: 'name'; value: string }[] = [];
+    if (form.name_en.trim()) translations.push({ locale: 'en', field: 'name', value: form.name_en });
+    if (form.name_fr.trim()) translations.push({ locale: 'fr', field: 'name', value: form.name_fr });
+    const data = { name: form.name, order: form.order, collapse: form.collapse, visibility: form.visibility, translations };
+    try {
+      if (editId) {
+        await api.updateComponentGroup(editId, data);
+      } else {
+        await api.createComponentGroup(data);
+      }
+      setShowForm(false);
+      setEditId(null);
+      setForm(emptyGroupForm);
+      onChange();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error saving group');
+    }
+  };
+
+  const handleEdit = (g: ComponentGroup) => {
+    setForm({ name: g.name, name_en: translation(g, 'en'), name_fr: translation(g, 'fr'), order: g.order, collapse: g.collapse, visibility: g.visibility });
+    setEditId(g.id);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (g: ComponentGroup) => {
+    if (!confirm(`Delete the group "${g.name}"? Its components are kept, without a group.`)) return;
+    try {
+      await api.deleteComponentGroup(g.id);
+      onChange();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error deleting group');
+    }
+  };
+
+  const collapseLabel = { never: 'Always expanded', always: 'Always collapsed', operational: 'Collapsed while operational' };
+
+  return (
+    <div className="mt-8">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Component groups</h2>
+        <button onClick={() => { setShowForm(true); setEditId(null); setForm(emptyGroupForm); }}
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+          Add Group
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded mb-4">
+          <div className="grid grid-cols-3 gap-4">
+            <input type="text" placeholder="Name (default)" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+              className="border rounded px-3 py-2" required maxLength={255} />
+            <input type="text" placeholder="Name (English)" value={form.name_en} onChange={e => setForm({...form, name_en: e.target.value})}
+              className="border rounded px-3 py-2" />
+            <input type="text" placeholder="Name (French)" value={form.name_fr} onChange={e => setForm({...form, name_fr: e.target.value})}
+              className="border rounded px-3 py-2" />
+            <input type="number" placeholder="Order" value={form.order} onChange={e => setForm({...form, order: parseInt(e.target.value) || 0})}
+              className="border rounded px-3 py-2" />
+            <select value={form.collapse} onChange={e => setForm({...form, collapse: e.target.value as ComponentGroup['collapse']})} className="border rounded px-3 py-2">
+              <option value="never">{collapseLabel.never}</option>
+              <option value="always">{collapseLabel.always}</option>
+              <option value="operational">{collapseLabel.operational}</option>
+            </select>
+            <select value={form.visibility} onChange={e => setForm({...form, visibility: e.target.value as ComponentGroup['visibility']})} className="border rounded px-3 py-2">
+              <option value="public">Public</option>
+              <option value="authenticated">Logged-in users only</option>
+            </select>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+              {editId ? 'Update' : 'Create'}
+            </button>
+            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border p-2 text-left">Name</th>
+            <th className="border p-2 text-left">Order</th>
+            <th className="border p-2 text-left">Display</th>
+            <th className="border p-2 text-left">Visibility</th>
+            <th className="border p-2 text-left">Components</th>
+            <th className="border p-2 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map(g => (
+            <tr key={g.id}>
+              <td className="border p-2">{g.name}</td>
+              <td className="border p-2">{g.order}</td>
+              <td className="border p-2">{collapseLabel[g.collapse]}</td>
+              <td className="border p-2">{g.visibility === 'public' ? 'Public' : 'Logged-in users only'}</td>
+              <td className="border p-2">{g.components?.length || 0}</td>
+              <td className="border p-2">
+                <button onClick={() => handleEdit(g)} className="text-blue-500 mr-2">Edit</button>
+                <button onClick={() => handleDelete(g)} className="text-red-500">Delete</button>
+              </td>
+            </tr>
+          ))}
+          {groups.length === 0 && (
+            <tr><td colSpan={6} className="border p-4 text-center text-gray-500">No groups. Components are listed without grouping.</td></tr>
+          )}
         </tbody>
       </table>
     </div>

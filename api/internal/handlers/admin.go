@@ -17,6 +17,8 @@ type CreateComponentRequest struct {
 	Name   string                    `json:"name" binding:"required"`
 	Status string                    `json:"status" binding:"required,oneof=operational degraded_performance partial_outage major_outage"`
 	Order  int                       `json:"order"`
+	// GroupID puts the component in a group. 0 or absent means no group.
+	GroupID *uint                    `json:"group_id"`
 	Translations []TranslationRequest `json:"translations"`
 }
 
@@ -25,6 +27,9 @@ type UpdateComponentRequest struct {
 	Name   string                    `json:"name"`
 	Status string                    `json:"status" binding:"omitempty,oneof=operational degraded_performance partial_outage major_outage"`
 	Order  *int                      `json:"order"`
+	// GroupID moves the component to a group; 0 removes it from its group.
+	// Absent leaves it unchanged.
+	GroupID *uint                    `json:"group_id"`
 	Translations []TranslationRequest `json:"translations"`
 }
 
@@ -69,11 +74,17 @@ func CreateComponent(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		groupID, ok := resolveGroupID(c, db, req.GroupID)
+		if !ok {
+			return
+		}
+
 		// Create component
 		component := models.Component{
-			Name:   req.Name,
-			Status: req.Status,
-			Order:  req.Order,
+			Name:    req.Name,
+			Status:  req.Status,
+			Order:   req.Order,
+			GroupID: groupID,
 		}
 
 		// Start transaction
@@ -158,6 +169,14 @@ func UpdateComponent(db *gorm.DB) gin.HandlerFunc {
 		}
 		if req.Order != nil {
 			component.Order = *req.Order
+		}
+		if req.GroupID != nil {
+			groupID, ok := resolveGroupID(c, tx, req.GroupID)
+			if !ok {
+				tx.Rollback()
+				return
+			}
+			component.GroupID = groupID
 		}
 
 		if err := tx.Save(&component).Error; err != nil {
@@ -247,7 +266,7 @@ func DeleteComponent(db *gorm.DB) gin.HandlerFunc {
 func ListComponents(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var components []models.Component
-		if err := db.Preload("Translations").Order("\"order\" ASC, id ASC").Find(&components).Error; err != nil {
+		if err := models.ByDisplayOrder(db).Preload("Translations").Find(&components).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch components"})
 			return
 		}
