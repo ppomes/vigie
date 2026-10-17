@@ -13,23 +13,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// getTranslationValue retrieves a translated value with fallback to English then default
+// getTranslationValue retrieves a translated value, see models.TranslatedValue.
 func getTranslationValue(translations []models.Translation, field, locale, defaultValue string) string {
-	// Try requested locale first
-	for _, t := range translations {
-		if t.Field == field && t.Locale == locale {
-			return t.Value
-		}
-	}
-	// Fall back to English
-	if locale != "en" {
-		for _, t := range translations {
-			if t.Field == field && t.Locale == "en" {
-				return t.Value
-			}
-		}
-	}
-	return defaultValue
+	return models.TranslatedValue(translations, field, locale, defaultValue)
 }
 
 // CreateMaintenanceRequest represents the request to create a new maintenance

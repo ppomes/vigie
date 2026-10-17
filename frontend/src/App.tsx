@@ -238,11 +238,11 @@ function IncidentsList() {
     // Try current locale
     const translation = incident.translations?.find(t => t.field === field && t.locale === locale);
     if (translation?.value) return translation.value;
+    // Then the incident's own name, in the language it was written in
+    if (field === 'name' && incident.name) return incident.name;
     // Fall back to English
     const enTranslation = incident.translations?.find(t => t.field === field && t.locale === 'en');
-    if (enTranslation?.value) return enTranslation.value;
-    // Fall back to default (for name only)
-    return field === 'name' ? incident.name : '';
+    return enTranslation?.value || '';
   };
 
   if (loading) return <p className="text-muted">{t('common.loading')}</p>;
