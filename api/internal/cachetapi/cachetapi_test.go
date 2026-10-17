@@ -363,3 +363,31 @@ func TestErrors(t *testing.T) {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+func TestDatesInCachetsZone(t *testing.T) {
+	paris, err := time.LoadLocation("Europe/Paris")
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := apiZone
+	apiZone = func() *time.Location { return paris }
+	t.Cleanup(func() { apiZone = saved })
+
+	r, db := setup(t)
+	comp := testutil.CreateComponent(t, db, "DB", "operational")
+	s := data(t, send(t, r, http.MethodPost, "/schedules", map[string]any{
+		"name": "Upgrade", "status": 0,
+		"scheduled_at": "2026-11-05 02:00", "completed_at": "2026-11-05 04:00",
+		"components": map[string]any{itoa(int(comp.ID)): 0},
+	}, true))
+	if s["scheduled_at"] != "2026-11-05 02:00:00" {
+		t.Fatalf("scheduled_at %v, want the time as sent", s["scheduled_at"])
+	}
+	var m models.Maintenance
+	if err := db.First(&m, num(s["id"])).Error; err != nil {
+		t.Fatal(err)
+	}
+	if want := time.Date(2026, 11, 5, 1, 0, 0, 0, time.UTC); !m.StartAt.Equal(want) {
+		t.Fatalf("stored start %v, want %v: 02:00 in Paris", m.StartAt, want)
+	}
+}

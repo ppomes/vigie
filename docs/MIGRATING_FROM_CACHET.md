@@ -28,6 +28,8 @@ Set these variables for the API (in `.env` for Docker Compose, under
 | `PUBLIC_URL` | Address of the public status page, for example the Cachet one: `https://status.example.com` |
 | `API_URL` | Address readers use to reach the API, in email links |
 | `ADMIN_URL` | Address of the admin, where old `/dashboard` links go |
+| `CACHET_API_TIMEZONE` | Cachet's `APP_TIMEZONE`, so that integrations see the same times as before. `UTC` by default |
+| `CACHET_API_LOCALE` | The language of Cachet's text, as `--locale` below. `en` by default |
 | `EMAIL_*` | Your email provider, as in [the README](../README.md) |
 
 ## 3. Dry run

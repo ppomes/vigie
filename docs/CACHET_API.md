@@ -71,6 +71,10 @@ Cachet 2.4.1.
   through this API are stored in English, or in the locale set by
   `CACHET_API_LOCALE` (`en` or `fr`). Other translations, added in the admin,
   are kept.
+- **Dates have no zone, as in Cachet.** They are read and written in the
+  zone set by `CACHET_API_TIMEZONE`, UTC by default. Set it to Cachet's
+  `APP_TIMEZONE` so that integrations see the same times as before. Dates
+  sent with an offset (RFC 3339) keep it.
 - **Groups created through this API** are visible to logged-in users only
   unless `visible=1` is sent, as in Cachet.
 - Metrics, subscribers, subscriptions and incident templates have no endpoint

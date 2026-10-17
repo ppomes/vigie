@@ -221,6 +221,13 @@ config:
   # Defaults to the admin ingress host.
   adminUrl: ""
 
+  # -- Cachet compatible API: the language of Cachet's text, en or fr.
+  cachetApiLocale: en
+
+  # -- Cachet compatible API: the zone of the dates it reads and writes,
+  # Cachet's APP_TIMEZONE.
+  cachetApiTimezone: UTC
+
 # =============================================================================
 # Email Configuration
 # =============================================================================

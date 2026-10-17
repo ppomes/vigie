@@ -719,7 +719,7 @@ func (im *importer) leftovers() error {
 // APP_TIMEZONE may not be UTC either.
 func (im *importer) checkZone() {
 	if im.zone != nil && im.zone != time.UTC {
-		im.report.note("Cachet's dates were read as %s times (--source-timezone).", im.zone)
+		im.report.note("Cachet's dates were read as %s times (--source-timezone). Set CACHET_API_TIMEZONE=%s, so that integrations see the same times as in Cachet.", im.zone, im.zone)
 		return
 	}
 	if tz := im.settings["app_timezone"]; tz != "" && tz != "UTC" {
