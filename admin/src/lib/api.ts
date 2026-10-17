@@ -232,6 +232,12 @@ export interface BrandingConfig {
   logo: string;
 }
 
+export interface Customization {
+  css: string;
+  header_html: string;
+  footer_html: string;
+}
+
 export interface TemplateVariable {
   name: string;
   label_en: string;
@@ -327,6 +333,9 @@ export const api = {
 
   // Branding settings
   getBranding: () => fetchAPI<BrandingConfig>('/settings/branding'),
+  getCustomization: () => fetchAPI<Customization>('/settings/customization'),
+  updateCustomization: (c: Customization) =>
+    fetchAPI<Customization>('/admin/settings/customization', { method: 'PUT', body: JSON.stringify(c) }),
   updateBranding: (config: BrandingConfig) =>
     fetchAPI<{ message: string; config: BrandingConfig }>('/admin/settings/branding', { method: 'PUT', body: JSON.stringify(config) }),
 
