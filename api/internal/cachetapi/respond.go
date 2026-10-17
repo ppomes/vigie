@@ -3,6 +3,7 @@ package cachetapi
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"math"
 	"net/http"
 	"net/url"
@@ -113,4 +114,11 @@ func sortQuery(c *gin.Context, q *gorm.DB, allowed map[string]string, fallback .
 
 func by(col string, desc bool) clause.OrderByColumn {
 	return clause.OrderByColumn{Column: clause.Column{Name: col}, Desc: desc}
+}
+
+// notFound tells whether a lookup error means the record is not there: no
+// such row, or an id that is not a number (or too large to be one).
+func notFound(err error) bool {
+	var numErr *strconv.NumError
+	return errors.Is(err, gorm.ErrRecordNotFound) || errors.As(err, &numErr)
 }

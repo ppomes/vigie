@@ -93,7 +93,7 @@ func findIncident(c *gin.Context, db *gorm.DB) (models.Incident, bool) {
 		err = incidentQuery(c, db).First(&inc, id).Error
 	}
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, strconv.ErrSyntax) {
+		if notFound(err) {
 			fail(c, http.StatusNotFound, "Incident not found")
 		} else {
 			fail(c, http.StatusInternalServerError, "Failed to fetch incident")

@@ -3,6 +3,7 @@ package cachetapi
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -267,6 +268,57 @@ func TestSchedulesHideHiddenComponentsFromAnonymousReaders(t *testing.T) {
 	list := dataList(t, send(t, r, http.MethodGet, "/schedules", nil, false))
 	if got := len(list[0].(map[string]any)["components"].([]any)); got != 1 {
 		t.Fatalf("components in the anonymous list: %d, want 1", got)
+	}
+}
+
+func TestAuthenticatedGroupReadsIncludeDisabledComponents(t *testing.T) {
+	r, db := setup(t)
+	g := data(t, send(t, r, http.MethodPost, "/components/groups", map[string]any{"name": "Web", "visible": 1}, true))
+	gid := uint(num(g["id"]))
+	for _, enabled := range []bool{true, false} {
+		comp := testutil.CreateComponent(t, db, fmt.Sprint("enabled ", enabled), "operational")
+		db.Model(&comp).UpdateColumns(map[string]any{"group_id": gid, "enabled": enabled})
+	}
+	path := "/components/groups/" + itoa(int(gid))
+	if n := len(data(t, send(t, r, http.MethodGet, path, nil, true))["enabled_components"].([]any)); n != 2 {
+		t.Fatalf("components seen with a key: %d, want 2", n)
+	}
+	if n := len(data(t, send(t, r, http.MethodGet, path, nil, false))["enabled_components"].([]any)); n != 1 {
+		t.Fatalf("components seen anonymously: %d, want 1", n)
+	}
+}
+
+func TestScheduleUpdateKeepsTheMainComponent(t *testing.T) {
+	r, db := setup(t)
+	a := testutil.CreateComponent(t, db, "A", "operational")
+	b := testutil.CreateComponent(t, db, "B", "operational")
+	now := time.Now().UTC()
+	s := data(t, send(t, r, http.MethodPost, "/schedules", map[string]any{
+		"name": "Upgrade", "status": 0,
+		"scheduled_at": now.Add(time.Hour).Format("2006-01-02 15:04"), "completed_at": now.Add(2 * time.Hour).Format("2006-01-02 15:04"),
+		"components": map[string]any{itoa(int(b.ID)): 0},
+	}, true))
+	id := num(s["id"])
+	send(t, r, http.MethodPut, "/schedules/"+itoa(id), map[string]any{
+		"components": map[string]any{itoa(int(a.ID)): 0, itoa(int(b.ID)): 0},
+	}, true)
+	var m models.Maintenance
+	db.First(&m, id)
+	if models.IDValue(m.ComponentID) != b.ID {
+		t.Fatalf("main component %d after adding A, want B (%d)", models.IDValue(m.ComponentID), b.ID)
+	}
+}
+
+func TestBadIDsAndLargeBodies(t *testing.T) {
+	r, _ := setup(t)
+	for _, path := range []string{"/components/99999999999", "/components/groups/99999999999", "/incidents/99999999999", "/schedules/99999999999", "/incidents/x"} {
+		if res := send(t, r, http.MethodGet, path, nil, false); res.code != http.StatusNotFound {
+			t.Errorf("GET %s: %d, want 404", path, res.code)
+		}
+	}
+	big := map[string]any{"name": strings.Repeat("x", 2<<20)}
+	if res := send(t, r, http.MethodGet, "/components", big, false); res.code != http.StatusBadRequest {
+		t.Fatalf("2 MiB body: %d, want 400", res.code)
 	}
 }
 

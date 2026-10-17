@@ -1,7 +1,6 @@
 package cachetapi
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,12 +14,16 @@ import (
 
 var groupSorts = map[string]string{"id": "id", "name": "name", "order": "order", "created_at": "created_at", "updated_at": "updated_at"}
 
-// groupQuery reads groups with their enabled components. Anonymous readers
-// only see public groups.
+// groupQuery reads groups with their components. Anonymous readers only see
+// public groups, and their enabled components.
 func groupQuery(c *gin.Context, db *gorm.DB) *gorm.DB {
 	q := db.Model(&models.ComponentGroup{}).
 		Preload("Components", func(tx *gorm.DB) *gorm.DB {
-			return models.ByDisplayOrder(tx).Where("enabled = ?", true).Preload("Translations").Preload("Tags")
+			q := models.ByDisplayOrder(tx).Preload("Translations").Preload("Tags")
+			if !authenticated(c) {
+				q = q.Where("enabled = ?", true)
+			}
+			return q
 		})
 	if !authenticated(c) {
 		q = q.Where("visibility = ?", models.GroupVisibilityPublic)
@@ -55,7 +58,7 @@ func findGroup(c *gin.Context, db *gorm.DB) (models.ComponentGroup, bool) {
 		err = groupQuery(c, db).First(&g, id).Error
 	}
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, strconv.ErrSyntax) {
+		if notFound(err) {
 			fail(c, http.StatusNotFound, "Component group not found")
 		} else {
 			fail(c, http.StatusInternalServerError, "Failed to fetch component group")

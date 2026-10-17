@@ -67,7 +67,7 @@ func findSchedule(c *gin.Context, db *gorm.DB) (models.Maintenance, bool) {
 		err = scheduleQuery(c, db).First(&m, id).Error
 	}
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, strconv.ErrSyntax) {
+		if notFound(err) {
 			fail(c, http.StatusNotFound, "Schedule not found")
 		} else {
 			fail(c, http.StatusInternalServerError, "Failed to fetch schedule")
@@ -129,7 +129,11 @@ func scheduleBody(in input, existing *models.Maintenance) (map[string]any, error
 	if ids, ok, err := in.idMap("components"); err != nil {
 		return nil, err
 	} else if ok {
-		body["component_id"] = 0
+		// On an update, the main component stays first while it is still
+		// covered.
+		if existing == nil {
+			body["component_id"] = 0
+		}
 		body["component_ids"] = ids
 	}
 	if v, ok := in.str("message"); ok {

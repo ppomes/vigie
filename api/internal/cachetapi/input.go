@@ -3,11 +3,17 @@ package cachetapi
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
+
+// maxBody bounds the request bodies read here, for anonymous list requests
+// as for writes. Cachet requests are small forms or JSON objects.
+const maxBody = 1 << 20
 
 // input holds a request's parameters the way Cachet reads them: the query
 // string, then a JSON or form body on top.
@@ -21,6 +27,7 @@ func readInput(c *gin.Context) (input, error) {
 	if c.Request.Body == nil || c.Request.ContentLength == 0 {
 		return in, nil
 	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBody)
 	ct := c.ContentType()
 	switch {
 	case strings.Contains(ct, "json"):
@@ -182,5 +189,8 @@ func (in input) idMap(key string) ([]uint, bool, error) {
 		}
 		ids = append(ids, uint(n))
 	}
+	// Sorted: JSON objects and forms come in no particular order, and the
+	// first id becomes the main component when there is none.
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	return ids, true, nil
 }
