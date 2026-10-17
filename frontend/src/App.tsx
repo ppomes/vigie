@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getComponents, getComponentGroups, getIncidents, getMaintenances, getStatus, subscribe, getSubscription, updateSubscription, Component, ComponentGroup, Incident, Maintenance, SystemStatus } from './lib/api';
+import { getComponents, getComponentGroups, getIncidents, getMaintenances, getStatus, getCustomization, subscribe, getSubscription, updateSubscription, Component, ComponentGroup, Incident, Maintenance, SystemStatus, Customization } from './lib/api';
 import { useTheme } from './themes/ThemeContext';
 import { useBranding } from './themes/BrandingContext';
+import { setCustomCSS } from './themes/styles';
 
 const statusClasses: Record<string, string> = {
   operational: 'status-operational',
@@ -654,7 +655,42 @@ function FullWidthLayout() {
   );
 }
 
+// useCustomization loads the admin's custom CSS, header and footer, and
+// applies the CSS.
+function useCustomization(): Customization | null {
+  const [custom, setCustom] = useState<Customization | null>(null);
+  useEffect(() => {
+    getCustomization()
+      .then(c => {
+        setCustomCSS(c.css || '');
+        setCustom(c);
+      })
+      .catch(() => {
+        // The page works without its customization.
+      });
+  }, []);
+  return custom;
+}
+
+// CustomHTML shows the admin's header or footer. The API sanitizes it
+// (no scripts, event handlers, forms or frames) before sending it.
+function CustomHTML({ html, className }: { html?: string; className: string }) {
+  if (!html) return null;
+  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 export default function App() {
+  const custom = useCustomization();
+  return (
+    <>
+      <CustomHTML html={custom?.header_html} className="custom-header" />
+      <Page />
+      <CustomHTML html={custom?.footer_html} className="custom-footer" />
+    </>
+  );
+}
+
+function Page() {
   const { theme, loading } = useTheme();
   const manageToken = new URLSearchParams(window.location.search).get('manage');
 
