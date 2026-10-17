@@ -9,6 +9,38 @@ import (
 	"gorm.io/gorm"
 )
 
+// Models lists every table Vigie manages, for AutoMigrate.
+func Models() []any {
+	return []any{
+		&models.User{},
+		&models.Component{},
+		&models.Incident{},
+		&models.Subscriber{},
+		&models.Translation{},
+		&models.Settings{},
+		&models.IncidentTemplate{},
+		&models.NotificationQueue{},
+		&models.Maintenance{},
+		&models.MaintenanceTemplate{},
+		&models.AuditLog{},
+		&models.APIKey{},
+		&models.IncidentUpdate{},
+		&models.ComponentGroup{},
+		&models.Tag{},
+		&models.IncidentComponent{},
+		&models.MaintenanceComponent{},
+		&models.Subscription{},
+	}
+}
+
+// Migrate creates and updates the schema: AutoMigrate, then EnsureSchema.
+func Migrate(db *gorm.DB) error {
+	if err := db.AutoMigrate(Models()...); err != nil {
+		return fmt.Errorf("auto-migrate: %w", err)
+	}
+	return EnsureSchema(db)
+}
+
 // EnsureSchema applies schema changes that AutoMigrate cannot make. It is
 // idempotent and runs at startup, after AutoMigrate.
 func EnsureSchema(db *gorm.DB) error {

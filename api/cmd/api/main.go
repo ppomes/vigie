@@ -13,6 +13,7 @@ import (
 	"api/internal/cachetapi"
 	"api/internal/database"
 	"api/internal/handlers"
+	"api/internal/importer"
 	"api/internal/middleware"
 	"api/internal/models"
 	"api/internal/services"
@@ -20,6 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func main() {
@@ -28,39 +30,29 @@ func main() {
 		log.Println("Warning: .env file not found, using environment variables")
 	}
 
+	// "api import-cachet ..." imports a Cachet 2.4 installation and exits
+	if len(os.Args) > 1 && os.Args[1] == "import-cachet" {
+		os.Exit(importer.RunCLI(os.Args[2:], func() (*gorm.DB, error) {
+			db, err := database.Connect()
+			if err != nil {
+				return nil, err
+			}
+			// Keep the report readable: lookups that find nothing are
+			// expected during an import.
+			db = db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)})
+			return db, database.Migrate(db)
+		}, os.Stdout))
+	}
+
 	// Connect to database
 	db, err := database.Connect()
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Auto-migrate models
-	if err := db.AutoMigrate(
-		&models.User{},
-		&models.Component{},
-		&models.Incident{},
-		&models.Subscriber{},
-		&models.Translation{},
-		&models.Settings{},
-		&models.IncidentTemplate{},
-		&models.NotificationQueue{},
-		&models.Maintenance{},
-		&models.MaintenanceTemplate{},
-		&models.AuditLog{},
-		&models.APIKey{},
-		&models.IncidentUpdate{},
-		&models.ComponentGroup{},
-		&models.Tag{},
-		&models.IncidentComponent{},
-		&models.MaintenanceComponent{},
-		&models.Subscription{},
-	); err != nil {
+	// Create and update the schema
+	if err := database.Migrate(db); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
-	}
-
-	// Schema changes AutoMigrate cannot make
-	if err := database.EnsureSchema(db); err != nil {
-		log.Fatalf("Failed to update database schema: %v", err)
 	}
 
 	// Initialize audit service
