@@ -62,6 +62,7 @@
     "save": "Save",
     "saved": "Your choice is saved.",
     "error": "This link is not valid any more.",
+    "saveError": "Your choice could not be saved. Please try again.",
     "back": "Back to the status page"
   }
 }

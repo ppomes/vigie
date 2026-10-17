@@ -62,6 +62,7 @@
     "save": "Enregistrer",
     "saved": "Votre choix est enregistré.",
     "error": "Ce lien n'est plus valide.",
+    "saveError": "Votre choix n'a pas pu être enregistré. Veuillez réessayer.",
     "back": "Retour à la page de statut"
   }
 }

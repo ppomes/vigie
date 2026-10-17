@@ -381,9 +381,9 @@ function ManageSubscription({ token }: { token: string }) {
         setIds(choice.component_ids || []);
         setState('ready');
       })
-      .catch(err => {
+      .catch(() => {
         setState('error');
-        setMessage(err instanceof Error ? err.message : t('manage.error'));
+        setMessage(t('manage.error'));
       });
   }, [token]);
 
@@ -393,8 +393,9 @@ function ManageSubscription({ token }: { token: string }) {
       await updateSubscription(token, { global: all, component_ids: all ? [] : ids });
       setState('saved');
       setMessage(t('manage.saved'));
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : t('manage.error'));
+    } catch {
+      setState('ready');
+      setMessage(t('manage.saveError'));
     }
   };
 
