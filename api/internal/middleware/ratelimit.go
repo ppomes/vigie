@@ -82,6 +82,20 @@ func (rl *RateLimiter) isAllowed(ip string) bool {
 	return true
 }
 
+// Exceeded reports whether key has used up its limit, without counting
+// anything.
+func (rl *RateLimiter) Exceeded(key string) bool {
+	rl.mu.RLock()
+	defer rl.mu.RUnlock()
+	info, ok := rl.requests[key]
+	return ok && time.Since(info.firstSeen) <= rl.window && info.count >= rl.limit
+}
+
+// Record counts one event for key, such as a failed attempt.
+func (rl *RateLimiter) Record(key string) {
+	rl.isAllowed(key)
+}
+
 // Middleware returns a gin middleware that enforces rate limiting
 func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -101,8 +115,15 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 
 // Global rate limiters for different endpoints
 var (
-	// LoginLimiter: 5 attempts per 15 minutes per IP
-	LoginLimiter = NewRateLimiter(5, 15*time.Minute)
+	// LoginLimiter: 10 requests per 15 minutes per IP. A two-factor login
+	// takes two requests (password, then code), so this is still about five
+	// attempts.
+	LoginLimiter = NewRateLimiter(10, 15*time.Minute)
+
+	// TwoFactorLimiter: 5 wrong two-factor codes per 15 minutes per user.
+	// The login limiter is per IP; this one bounds the guesses at one
+	// account's codes however many addresses they come from.
+	TwoFactorLimiter = NewRateLimiter(5, 15*time.Minute)
 
 	// PasswordResetLimiter: 3 requests per hour per IP
 	PasswordResetLimiter = NewRateLimiter(3, time.Hour)

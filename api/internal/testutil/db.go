@@ -43,6 +43,7 @@ func NewDB(t *testing.T) *gorm.DB {
 		&models.Translation{},
 		&models.User{},
 		&models.APIKey{},
+		&models.RecoveryCode{},
 		&models.AuditLog{},
 		&models.IncidentUpdate{},
 		&models.Subscriber{},

@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, Fragment } from 'react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey, IncidentUpdateInput, ComponentGroup } from './lib/api';
+import TwoFactorModal from './pages/TwoFactor';
 
 // User context for role-based access
 interface UserContextType {
@@ -2704,6 +2705,16 @@ function UsersPage() {
     }
   };
 
+  const handleResetTwoFactor = async (u: User) => {
+    if (!confirm(`Turn two-factor login off for ${u.username}? Do this only if they lost their phone and their recovery codes.`)) return;
+    try {
+      await api.resetUserTwoFactor(u.id);
+      loadUsers();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to reset two-factor login');
+    }
+  };
+
   const handleResetPassword = async (id: number) => {
     if (!newPassword || newPassword.length < 8) {
       alert('Password must be at least 8 characters');
@@ -2778,6 +2789,7 @@ function UsersPage() {
             <th className="border p-2 text-left">Email</th>
             <th className="border p-2 text-left">Role</th>
             <th className="border p-2 text-left">Status</th>
+            <th className="border p-2 text-left">2FA</th>
             <th className="border p-2 text-left">Last Login</th>
             <th className="border p-2 text-left">Actions</th>
           </tr>
@@ -2797,6 +2809,7 @@ function UsersPage() {
                   {u.active ? 'Active' : 'Inactive'}
                 </span>
               </td>
+              <td className="border p-2">{u.two_factor_enabled ? 'On' : 'Off'}</td>
               <td className="border p-2">{u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}</td>
               <td className="border p-2">
                 {u.id !== currentUser?.id && (
@@ -2806,6 +2819,9 @@ function UsersPage() {
                       {u.active ? 'Deactivate' : 'Activate'}
                     </button>
                     <button onClick={() => setShowPasswordReset(u.id)} className="text-orange-500 mr-2">Reset Password</button>
+                    {u.two_factor_enabled && (
+                      <button onClick={() => handleResetTwoFactor(u)} className="text-orange-500 mr-2">Reset 2FA</button>
+                    )}
                     <button onClick={() => handleDelete(u.id)} className="text-red-500">Delete</button>
                   </>
                 )}
@@ -3135,6 +3151,8 @@ export default function App() {
   const location = useLocation();
   const [user, setUser] = useState<UserContextType['user']>(null);
 
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
+
   // Change password modal state
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
@@ -3249,6 +3267,9 @@ export default function App() {
               <button onClick={() => setShowChangePassword(true)} className="text-blue-500 hover:text-blue-700">
                 Change Password
               </button>
+              <button onClick={() => setShowTwoFactor(true)} className="text-blue-500 hover:text-blue-700">
+                Two-Factor Login
+              </button>
               <button onClick={handleLogout} className="text-red-500 hover:text-red-700">
                 Logout
               </button>
@@ -3282,6 +3303,8 @@ export default function App() {
             </Routes>
           </div>
         </div>
+
+        {showTwoFactor && <TwoFactorModal onClose={() => setShowTwoFactor(false)} />}
 
         {/* Change Password Modal */}
         {showChangePassword && (

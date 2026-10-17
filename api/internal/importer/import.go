@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"api/internal/models"
+	"api/internal/totp"
 
 	"gorm.io/gorm"
 )
@@ -376,6 +377,16 @@ func (im *importer) importUsers() error {
 			}
 			nu := models.User{Username: u.Username, Email: strings.ToLower(u.Email), Password: u.Password, Role: role,
 				Active: u.Active, CreatedAt: timeOr(u.CreatedAt, now), UpdatedAt: timeOr(u.UpdatedAt, now)}
+			if u.Google2faSecret != nil && *u.Google2faSecret != "" {
+				// Cachet stores the secret as plain base32, so users keep
+				// the entry they have in their authenticator app.
+				if secret, err := totp.NormalizeSecret(*u.Google2faSecret); err == nil {
+					nu.TwoFactorSecret = &secret
+					im.report.imported("two-factor secrets")
+				} else {
+					im.report.skip("two-factor secret (not a valid TOTP secret)", label)
+				}
+			}
 			if err := im.create(&nu, map[string]bool{"active": u.Active}); err != nil {
 				return err
 			}
@@ -384,8 +395,8 @@ func (im *importer) importUsers() error {
 		default:
 			return err
 		}
-		if u.Google2faSecret != nil && *u.Google2faSecret != "" {
-			im.report.skip("two-factor secret (Vigie has no two-factor login)", label)
+		if err == nil && u.Google2faSecret != nil && *u.Google2faSecret != "" {
+			im.report.skip("two-factor secret (the user already exists in Vigie)", label)
 		}
 		if u.APIKey != nil && *u.APIKey != "" {
 			key := models.NewAPIKey("Imported from Cachet ("+u.Username+")", *u.APIKey, im.users[u.ID])
@@ -394,6 +405,10 @@ func (im *importer) importUsers() error {
 			}
 			im.report.imported("API keys")
 		}
+	}
+	if n := im.report.Imported["two-factor secrets"]; n > 0 {
+		im.report.note("Two-factor login carried over for %d of the users, with the same entry in their authenticator app. "+
+			"They have no recovery codes yet: ask them to make some from \"Two-Factor Login\" in the admin.", n)
 	}
 	return nil
 }
