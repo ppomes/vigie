@@ -12,10 +12,10 @@ type Subscriber struct {
 	ID                uint           `gorm:"primaryKey" json:"id"`
 	Email             string         `gorm:"size:255;not null;unique" json:"email"`
 	Locale            string         `gorm:"size:5;not null;default:'en'" json:"locale"` // Preferred language: en, fr
-	Confirmed         bool           `gorm:"default:false" json:"confirmed"`
+	Confirmed         bool           `gorm:"default:0" json:"confirmed"`
 	// Global subscribers hear about every component. Others only about the
 	// components in Subscriptions.
-	Global        bool           `gorm:"not null;default:true" json:"global"`
+	Global        bool           `gorm:"not null;default:1" json:"global"`
 	Subscriptions []Subscription `gorm:"foreignKey:SubscriberID" json:"subscriptions,omitempty"`
 	ConfirmationToken string         `gorm:"size:255;index" json:"-"` // Hidden from JSON for security
 	UnsubscribeToken  string         `gorm:"size:255;unique;index" json:"-"` // Hidden from JSON for security

@@ -18,7 +18,7 @@ type Component struct {
 	Link string `gorm:"size:1024" json:"link,omitempty"`
 	// Enabled is false to hide a component from the public page without
 	// deleting it.
-	Enabled bool `gorm:"not null;default:true" json:"enabled"`
+	Enabled bool `gorm:"not null;default:1" json:"enabled"`
 	// Meta is free key/value data for integrations, as in Cachet.
 	Meta JSONMap `gorm:"type:text" json:"meta,omitempty"`
 	Tags []Tag   `gorm:"many2many:component_tags" json:"tags,omitempty"`
