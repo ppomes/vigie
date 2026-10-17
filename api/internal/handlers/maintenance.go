@@ -41,6 +41,9 @@ type CreateMaintenanceRequest struct {
 	ComponentID  uint                 `json:"component_id"`
 	// ComponentIDs lists more covered components.
 	ComponentIDs []uint               `json:"component_ids"`
+	// Notify is false to create the maintenance without notifying
+	// subscribers. It defaults to true.
+	Notify       *bool                `json:"notify"`
 	StartAt      time.Time            `json:"start_at" binding:"required"`
 	EndAt        time.Time            `json:"end_at" binding:"required"`
 	Translations []TranslationRequest `json:"translations"`
@@ -163,8 +166,9 @@ func CreateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 		// Reload maintenance with translations and components
 		db.Preload("Translations").Preload("Component").Preload("Components").First(&maintenance, maintenance.ID)
 
-		// Send notifications to subscribers (async, non-blocking)
-		if notificationService != nil {
+		// Send notifications to subscribers (async, non-blocking), unless
+		// asked not to
+		if notificationService != nil && (req.Notify == nil || *req.Notify) {
 			go func() {
 				if err := notificationService.NotifyMaintenanceScheduled(&maintenance); err != nil {
 					log.Printf("Failed to send maintenance notifications: %v", err)
@@ -397,8 +401,8 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 		// Get active (in_progress) and upcoming (scheduled) maintenances
 		var maintenances []models.Maintenance
 		if err := db.Preload("Translations").
-			Preload("Component", publicComponents).Preload("Component.Translations", "locale = ?", locale).
-			Preload("Components", publicAffectedComponents).
+			Preload("Component", PublicComponents).Preload("Component.Translations", "locale = ?", locale).
+			Preload("Components", PublicAffectedComponents).
 			Preload("Components.Component").Preload("Components.Component.Translations", "locale = ?", locale).
 			Where("status IN (?, ?) AND end_at > ?",
 				models.MaintenanceScheduled, models.MaintenanceInProgress, now).

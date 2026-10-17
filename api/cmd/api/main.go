@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"api/internal/cachetapi"
 	"api/internal/database"
 	"api/internal/handlers"
 	"api/internal/middleware"
@@ -227,6 +228,9 @@ func main() {
 			adminOnly.GET("/audit/export", handlers.ExportAuditLogs(auditService))
 		}
 	}
+
+	// Cachet 2.x compatible API, for tools written for Cachet
+	cachetapi.Register(router, db, notificationService)
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

@@ -114,6 +114,20 @@ func AuthRequiredWithDB(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuth authenticates the request when it carries credentials, and
+// lets it through anonymously otherwise. Invalid credentials are rejected,
+// so a misconfigured client does not silently lose its permissions.
+func OptionalAuth(db *gorm.DB) gin.HandlerFunc {
+	required := AuthRequiredWithDB(db)
+	return func(c *gin.Context) {
+		if c.GetHeader(CachetTokenHeader) == "" && c.GetHeader("Authorization") == "" {
+			c.Next()
+			return
+		}
+		required(c)
+	}
+}
+
 // RequireSession rejects requests authenticated with an API key. It guards
 // actions a machine credential should not perform, such as creating more keys.
 func RequireSession() gin.HandlerFunc {

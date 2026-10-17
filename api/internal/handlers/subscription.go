@@ -299,7 +299,7 @@ func publicComponentIDs(db *gorm.DB, requested []uint) ([]uint, string, error) {
 		return ids, "", nil
 	}
 	var count int64
-	if err := db.Model(&models.Component{}).Scopes(publicComponents).Where("id IN ?", ids).Count(&count).Error; err != nil {
+	if err := db.Model(&models.Component{}).Scopes(PublicComponents).Where("id IN ?", ids).Count(&count).Error; err != nil {
 		return nil, "", err
 	}
 	if int(count) != len(ids) {
