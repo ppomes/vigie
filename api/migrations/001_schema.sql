@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS translations (
     INDEX idx_translations_locale (locale),
     INDEX idx_translations_lookup (entity_id, entity_type, locale, field),
     UNIQUE KEY unique_translation (entity_id, entity_type, locale, field),
-    CONSTRAINT chk_translation_entity CHECK (entity_type IN ('component', 'incident', 'maintenance')),
+    CONSTRAINT chk_translation_entity CHECK (entity_type IN ('component', 'incident', 'maintenance', 'incident_update')),
     CONSTRAINT chk_translation_locale CHECK (locale IN ('en', 'fr')),
     CONSTRAINT chk_translation_field CHECK (field IN ('name', 'description', 'message'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

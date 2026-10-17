@@ -8,6 +8,13 @@ export interface Component {
   translations?: Translation[];
 }
 
+export interface IncidentUpdate {
+  id: number;
+  status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
+  translations?: Translation[];
+  created_at: string;
+}
+
 export interface Incident {
   id: number;
   name: string;
@@ -15,6 +22,8 @@ export interface Incident {
   component_id: number;
   component?: Component;
   translations?: Translation[];
+  // Timeline, newest first
+  updates?: IncidentUpdate[];
   created_at: string;
   updated_at: string;
 }

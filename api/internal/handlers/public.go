@@ -119,9 +119,12 @@ func GetIncidents(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// Build query with translations and component relationship
+		// The timeline is public; the authors' accounts are not loaded.
 		query := db.Preload("Translations", "locale = ?", locale).
 			Preload("Component").
-			Preload("Component.Translations", "locale = ?", locale)
+			Preload("Component.Translations", "locale = ?", locale).
+			Preload("Updates", updatesNewestFirst).
+			Preload("Updates.Translations", "locale = ?", locale)
 
 		// Apply status filter if provided
 		if statusFilter != "" {

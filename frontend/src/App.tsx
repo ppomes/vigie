@@ -161,6 +161,19 @@ function IncidentsList() {
                 {t(`incidentStatus.${incident.status}`)}
               </span>
             </div>
+            {(incident.updates || []).length > 0 && (
+              <ol className="space-y-2 mb-3 border-l-2 pl-3" style={{ borderColor: 'var(--color-card-border)' }}>
+                {(incident.updates || []).map(update => (
+                  <li key={update.id} className="text-sm">
+                    <span className="font-medium">{t(`incidentStatus.${update.status}`)}</span>
+                    <span className="text-muted"> · {new Date(update.created_at).toLocaleString()}</span>
+                    {update.translations?.find(tr => tr.field === 'message')?.value && (
+                      <p>{update.translations.find(tr => tr.field === 'message')?.value}</p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            )}
             {incidentMessage && (
               <p className="text-sm mb-2">{incidentMessage}</p>
             )}

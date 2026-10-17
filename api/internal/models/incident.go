@@ -15,6 +15,8 @@ type Incident struct {
 	ComponentID  uint           `gorm:"index" json:"component_id"`
 	Component    Component      `gorm:"foreignKey:ComponentID" json:"component,omitempty"`
 	Translations []Translation  `gorm:"polymorphic:Entity;polymorphicValue:incident" json:"translations,omitempty"`
+	// Updates is the incident timeline, oldest first unless a query orders it.
+	Updates []IncidentUpdate `gorm:"foreignKey:IncidentID" json:"updates,omitempty"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`

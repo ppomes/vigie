@@ -103,13 +103,31 @@ export interface Translation {
 // component status is left as it is.
 export type IncidentInput = Partial<Incident> & { component_status?: string };
 
+export interface IncidentUpdate {
+  id: number;
+  incident_id: number;
+  status: string;
+  user?: { username: string };
+  translations?: Translation[];
+  created_at: string;
+}
+
 export interface Incident {
   id: number;
   name: string;
   status: string;
   component_id: number;
   translations?: Translation[];
+  // Timeline, newest first
+  updates?: IncidentUpdate[];
   created_at: string;
+}
+
+// Body of a new incident update. Only "message" translations are accepted.
+export interface IncidentUpdateInput {
+  status: string;
+  translations: { locale: string; field: 'message'; value: string }[];
+  component_status?: string;
 }
 
 export interface Subscriber {
@@ -215,6 +233,10 @@ export const api = {
     fetchAPI<Incident>(`/admin/incidents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteIncident: (id: number) =>
     fetchAPI<void>(`/admin/incidents/${id}`, { method: 'DELETE' }),
+  createIncidentUpdate: (incidentId: number, data: IncidentUpdateInput) =>
+    fetchAPI<{ incident: Incident }>(`/admin/incidents/${incidentId}/updates`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteIncidentUpdate: (incidentId: number, updateId: number) =>
+    fetchAPI<{ incident: Incident }>(`/admin/incidents/${incidentId}/updates/${updateId}`, { method: 'DELETE' }),
 
   getSubscribers: () => fetchAPI<{ subscribers: Subscriber[] }>('/admin/subscribers').then(r => r.subscribers || []),
   deleteSubscriber: (id: number) =>
