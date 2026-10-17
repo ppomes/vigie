@@ -224,6 +224,10 @@ func main() {
 	// Cachet 2.x compatible API, for tools written for Cachet
 	cachetapi.Register(router, db, notificationService)
 
+	// Cachet 2.4 public URLs (incident links, subscription links, feeds),
+	// forwarded here by the public site
+	handlers.RegisterCachetRedirects(router, db)
+
 	// Get port from environment or use default
 	port := os.Getenv("PORT")
 	if port == "" {

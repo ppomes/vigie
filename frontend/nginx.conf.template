@@ -8,6 +8,17 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
 
+    # Cachet 2.4 public URLs, answered by the API: incident links, the
+    # subscribe page, links from old subscription emails, the dashboard,
+    # and the RSS and Atom feeds. API_UPSTREAM is set by the image (api:8080)
+    # and by the Helm chart.
+    location ~ ^/(incidents/[0-9]+|subscribe|subscribe/manage/.+|unsubscribe/.+|dashboard(/.*)?|rss|atom)$ {
+        proxy_pass http://${API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # Handle SPA routing - serve index.html for all routes
     location / {
         try_files $uri $uri/ /index.html;

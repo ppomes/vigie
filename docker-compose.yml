@@ -67,6 +67,8 @@ services:
       # (where they choose the components they follow)
       API_URL: ${API_URL:-http://localhost:8080}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      # The admin, where old Cachet /dashboard links redirect
+      ADMIN_URL: ${ADMIN_URL:-http://localhost:3001}
     ports:
       - "${API_PORT:-8080}:8080"
     networks:

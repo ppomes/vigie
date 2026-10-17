@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getComponents, getComponentGroups, getIncidents, getMaintenances, getStatus, subscribe, getSubscription, updateSubscription, Component, ComponentGroup, Incident, Maintenance, SystemStatus } from './lib/api';
 import { useTheme } from './themes/ThemeContext';
@@ -211,6 +211,19 @@ function IncidentsList() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [i18n.language]);
+
+  // Old Cachet incident links land on /#incident-<id>: scroll there once the
+  // list is on the page, before it is painted.
+  const scrolled = useRef(false);
+  useLayoutEffect(() => {
+    const target = window.location.hash.slice(1);
+    if (loading || scrolled.current || !target.startsWith('incident-')) return;
+    const el = document.getElementById(target);
+    if (el) {
+      el.scrollIntoView();
+      scrolled.current = true;
+    }
+  }, [loading, incidents]);
 
   // Helper to get localized translation with fallback
   const getTranslation = (incident: Incident, field: string): string => {
@@ -447,7 +460,7 @@ function SubscriptionForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="subscribe" onSubmit={handleSubmit} className="space-y-4">
       <div className="flex gap-2">
         <input
           type="email"

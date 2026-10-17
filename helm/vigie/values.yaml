@@ -217,6 +217,10 @@ config:
   # components to follow). Defaults to the frontend ingress host.
   publicUrl: ""
 
+  # -- Address of the admin, where old Cachet /dashboard links redirect.
+  # Defaults to the admin ingress host.
+  adminUrl: ""
+
 # =============================================================================
 # Email Configuration
 # =============================================================================
