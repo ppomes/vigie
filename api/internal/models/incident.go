@@ -12,7 +12,9 @@ type Incident struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
 	Name         string         `gorm:"size:255;not null" json:"name"`
 	Status       string         `gorm:"size:50;not null;default:'investigating'" json:"status"` // investigating, identified, monitoring, resolved
-	ComponentID  uint           `gorm:"index" json:"component_id"`
+	// ComponentID is the main affected component, or nil for a general
+	// incident that affects no component.
+	ComponentID *uint `gorm:"index" json:"component_id"`
 	// Visible is false for internal incidents, kept off the public page.
 	Visible bool `gorm:"not null;default:true" json:"visible"`
 	// Stickied incidents are pinned at the top of the public page.
@@ -24,7 +26,7 @@ type Incident struct {
 	Notifications bool `gorm:"not null;default:true" json:"notifications"`
 	// UserID is the author.
 	UserID *uint `gorm:"index" json:"user_id,omitempty"`
-	Component    Component      `gorm:"foreignKey:ComponentID" json:"component,omitempty"`
+	Component    *Component     `gorm:"foreignKey:ComponentID" json:"component,omitempty"`
 	Translations []Translation  `gorm:"polymorphic:Entity;polymorphicValue:incident" json:"translations,omitempty"`
 	// Components lists every affected component, including ComponentID.
 	Components []IncidentComponent `gorm:"foreignKey:IncidentID" json:"components,omitempty"`

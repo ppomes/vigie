@@ -29,3 +29,19 @@ type MaintenanceComponent struct {
 	CreatedAt      time.Time `json:"-"`
 	UpdatedAt      time.Time `json:"-"`
 }
+
+// OptionalID turns 0 into nil, for nullable foreign keys.
+func OptionalID(id uint) *uint {
+	if id == 0 {
+		return nil
+	}
+	return &id
+}
+
+// IDValue turns nil into 0.
+func IDValue(id *uint) uint {
+	if id == nil {
+		return 0
+	}
+	return *id
+}

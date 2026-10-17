@@ -151,7 +151,8 @@ export interface Incident {
   id: number;
   name: string;
   status: string;
-  component_id: number;
+  // Main affected component; null for a general incident
+  component_id: number | null;
   translations?: Translation[];
   // Timeline, newest first
   updates?: IncidentUpdate[];
@@ -430,8 +431,9 @@ export interface Maintenance {
   id: number;
   name: string;
   status: 'scheduled' | 'in_progress' | 'completed';
-  // Main component; components lists every covered one, main included
-  component_id: number;
+  // Main component, null for a general maintenance; components lists every
+  // covered one, main included
+  component_id: number | null;
   component?: Component;
   components?: { component_id: number }[];
   start_at: string;

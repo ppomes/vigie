@@ -16,6 +16,11 @@ func EnsureSchema(db *gorm.DB) error {
 		if err := ensureTranslationEntityCheck(db); err != nil {
 			return err
 		}
+		// General maintenances cover no component. 001_schema.sql created
+		// the column NOT NULL, and AutoMigrate does not relax it.
+		if err := ensureNullable(db, "maintenances", "component_id", "BIGINT UNSIGNED"); err != nil {
+			return err
+		}
 	}
 	return backfillAffectedComponents(db)
 }
@@ -83,4 +88,24 @@ func checkAllowsAll(clause string, values []string) bool {
 		}
 	}
 	return true
+}
+
+// ensureNullable makes a MySQL column nullable when it is not, keeping its
+// type. Foreign keys on the column stay in place.
+func ensureNullable(db *gorm.DB, table, column, columnType string) error {
+	var nullable string
+	err := db.Raw(`SELECT IS_NULLABLE FROM information_schema.COLUMNS
+		WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`, table, column).
+		Scan(&nullable).Error
+	if err != nil {
+		return fmt.Errorf("read %s.%s: %w", table, column, err)
+	}
+	if nullable != "NO" {
+		return nil
+	}
+	stmt := fmt.Sprintf("ALTER TABLE `%s` MODIFY `%s` %s NULL", table, column, columnType)
+	if err := db.Exec(stmt).Error; err != nil {
+		return fmt.Errorf("make %s.%s nullable: %w", table, column, err)
+	}
+	return nil
 }

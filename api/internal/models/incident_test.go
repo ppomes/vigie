@@ -9,16 +9,16 @@ func TestIncidentComponentRelationship(t *testing.T) {
 	incident := Incident{
 		Name:        "API Outage",
 		Status:      "investigating",
-		ComponentID: 1,
-		Component: Component{
+		ComponentID: OptionalID(1),
+		Component: &Component{
 			ID:     1,
 			Name:   "API",
 			Status: "major_outage",
 		},
 	}
 
-	if incident.ComponentID != 1 {
-		t.Errorf("Expected ComponentID=1, got %d", incident.ComponentID)
+	if IDValue(incident.ComponentID) != 1 {
+		t.Errorf("Expected ComponentID=1, got %d", IDValue(incident.ComponentID))
 	}
 
 	if incident.Component.ID != 1 {
@@ -37,7 +37,7 @@ func TestIncidentStatusValidation(t *testing.T) {
 		incident := Incident{
 			Name:        "Test Incident",
 			Status:      status,
-			ComponentID: 1,
+			ComponentID: OptionalID(1),
 		}
 
 		if incident.Status != status {
@@ -56,7 +56,7 @@ func TestInvalidIncidentStatus(t *testing.T) {
 		incident := Incident{
 			Name:        "Test Incident",
 			Status:      status,
-			ComponentID: 1,
+			ComponentID: OptionalID(1),
 		}
 
 		// These statuses should be rejected by database CHECK constraint
@@ -72,7 +72,7 @@ func TestIncidentRequiredFields(t *testing.T) {
 	incident := Incident{
 		Name:        "Database Connection Timeout",
 		Status:      "investigating",
-		ComponentID: 2,
+		ComponentID: OptionalID(2),
 	}
 
 	if incident.Name == "" {
@@ -83,7 +83,7 @@ func TestIncidentRequiredFields(t *testing.T) {
 		t.Error("Incident status is required but is empty")
 	}
 
-	if incident.ComponentID == 0 {
+	if IDValue(incident.ComponentID) == 0 {
 		t.Error("Incident component_id is required but is 0")
 	}
 }
@@ -92,7 +92,7 @@ func TestIncidentDefaultStatus(t *testing.T) {
 	// Test that default status is 'investigating' if not provided
 	incident := Incident{
 		Name:        "New Incident",
-		ComponentID: 1,
+		ComponentID: OptionalID(1),
 	}
 
 	// GORM would set default status to 'investigating' via struct tag
@@ -116,7 +116,7 @@ func TestIncidentTranslations(t *testing.T) {
 	incident := Incident{
 		Name:        "API Outage",
 		Status:      "investigating",
-		ComponentID: 1,
+		ComponentID: OptionalID(1),
 		Translations: []Translation{
 			{
 				EntityID: 1,
@@ -156,7 +156,7 @@ func TestIncidentStructure(t *testing.T) {
 		ID:          1,
 		Name:        "Test Incident",
 		Status:      "monitoring",
-		ComponentID: 3,
+		ComponentID: OptionalID(3),
 	}
 
 	if incident.ID != 1 {
@@ -171,8 +171,8 @@ func TestIncidentStructure(t *testing.T) {
 		t.Errorf("Expected Status='monitoring', got '%s'", incident.Status)
 	}
 
-	if incident.ComponentID != 3 {
-		t.Errorf("Expected ComponentID=3, got %d", incident.ComponentID)
+	if IDValue(incident.ComponentID) != 3 {
+		t.Errorf("Expected ComponentID=3, got %d", IDValue(incident.ComponentID))
 	}
 }
 
@@ -181,7 +181,7 @@ func TestIncidentCascadeDelete(t *testing.T) {
 	incident := Incident{
 		Name:        "Test Incident",
 		Status:      "resolved",
-		ComponentID: 1,
+		ComponentID: OptionalID(1),
 		Translations: []Translation{
 			{
 				EntityID: 1,

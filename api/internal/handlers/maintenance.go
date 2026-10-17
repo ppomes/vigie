@@ -108,7 +108,7 @@ func CreateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 		maintenance := models.Maintenance{
 			Name:        req.Name,
 			Status:      status,
-			ComponentID: componentIDs[0],
+			ComponentID: firstOf(componentIDs),
 			StartAt:     req.StartAt,
 			EndAt:       req.EndAt,
 		}
@@ -222,7 +222,7 @@ func UpdateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 		// the main component without a list replaces the set with it.
 		var componentIDs []uint
 		if req.ComponentID != nil || req.ComponentIDs != nil {
-			main := maintenance.ComponentID
+			main := models.IDValue(maintenance.ComponentID)
 			if req.ComponentID != nil {
 				main = *req.ComponentID
 			}
@@ -239,7 +239,7 @@ func UpdateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 				tx.Rollback()
 				return
 			}
-			maintenance.ComponentID = componentIDs[0]
+			maintenance.ComponentID = firstOf(componentIDs)
 		}
 		if req.StartAt != nil {
 			maintenance.StartAt = *req.StartAt
@@ -414,7 +414,7 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 			Name        string    `json:"name"`
 			Message     string    `json:"message"`
 			Status      string    `json:"status"`
-			ComponentID uint      `json:"component_id"`
+			ComponentID *uint     `json:"component_id"`
 			Component   string    `json:"component"`
 			// Components names every covered component, main one first.
 			Components []string  `json:"components"`
@@ -426,7 +426,10 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 		for _, m := range maintenances {
 			name := getTranslationValue(m.Translations, "name", locale, m.Name)
 			message := getTranslationValue(m.Translations, "message", locale, "")
-			componentName := getTranslationValue(m.Component.Translations, "name", locale, m.Component.Name)
+			componentName := ""
+			if m.Component != nil {
+				componentName = getTranslationValue(m.Component.Translations, "name", locale, m.Component.Name)
+			}
 			names := []string{}
 			for _, mc := range m.Components {
 				if mc.Component != nil {

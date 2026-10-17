@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS maintenances (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'scheduled',
-    component_id BIGINT UNSIGNED NOT NULL,
+    component_id BIGINT UNSIGNED NULL,
     start_at TIMESTAMP NOT NULL,
     end_at TIMESTAMP NOT NULL,
     previous_component_status VARCHAR(50) NULL,

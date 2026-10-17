@@ -14,7 +14,7 @@ import (
 
 func createMaintenance(t *testing.T, db *gorm.DB, componentID uint, status string, start, end time.Time) models.Maintenance {
 	t.Helper()
-	m := models.Maintenance{Name: "maint", Status: status, ComponentID: componentID, StartAt: start, EndAt: end}
+	m := models.Maintenance{Name: "maint", Status: status, ComponentID: models.OptionalID(componentID), StartAt: start, EndAt: end}
 	if err := db.Create(&m).Error; err != nil {
 		t.Fatalf("create maintenance: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestWorkerStartsAndEndsMaintenance(t *testing.T) {
 func TestWorkerIgnoresOpenIncidents(t *testing.T) {
 	db := testutil.NewDB(t)
 	c := testutil.CreateComponent(t, db, "API", ComponentOperational)
-	if err := db.Create(&models.Incident{Name: "slow", Status: "investigating", ComponentID: c.ID}).Error; err != nil {
+	if err := db.Create(&models.Incident{Name: "slow", Status: "investigating", ComponentID: models.OptionalID(c.ID)}).Error; err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()
@@ -203,7 +203,7 @@ func TestWorkerFailureDoesNotBlockOtherMaintenances(t *testing.T) {
 func TestIncidentUpdateNotificationUsesUpdateMessage(t *testing.T) {
 	db := testutil.NewDB(t)
 	c := testutil.CreateComponent(t, db, "API", ComponentOperational)
-	incident := models.Incident{Name: "Slow API", Status: "monitoring", ComponentID: c.ID}
+	incident := models.Incident{Name: "Slow API", Status: "monitoring", ComponentID: models.OptionalID(c.ID)}
 	if err := db.Create(&incident).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestNotificationsReachOnlyFollowers(t *testing.T) {
 	db.Create(&models.Subscription{SubscriberID: apiFan.ID, ComponentID: api.ID})
 	db.Create(&models.Subscription{SubscriberID: webFan.ID, ComponentID: web.ID})
 
-	incident := models.Incident{Name: "API slow", Status: "investigating", ComponentID: api.ID}
+	incident := models.Incident{Name: "API slow", Status: "investigating", ComponentID: models.OptionalID(api.ID)}
 	db.Create(&incident)
 	db.Create(&models.IncidentComponent{IncidentID: incident.ID, ComponentID: api.ID})
 

@@ -44,8 +44,8 @@ func TestIncidentAffectsSeveralComponents(t *testing.T) {
 	wantStatus(t, db, web.ID, "operational")
 	var incident models.Incident
 	db.First(&incident, id)
-	if incident.ComponentID != dbc.ID {
-		t.Fatalf("main component %d, want the first listed %d", incident.ComponentID, dbc.ID)
+	if models.IDValue(incident.ComponentID) != dbc.ID {
+		t.Fatalf("main component %d, want the first listed %d", models.IDValue(incident.ComponentID), dbc.ID)
 	}
 
 	// The public page lists every affected component.
@@ -208,8 +208,8 @@ func TestHiddenComponentsStayOffPublicIncidentsAndMaintenances(t *testing.T) {
 		t.Fatalf("public incidents: %d, want 1", len(incidents.Incidents))
 	}
 	i := incidents.Incidents[0]
-	if i.Component.Name != "" || len(i.Components) != 1 || i.Components[0].ComponentID != shown.ID {
-		t.Fatalf("public incident components: main %q, affected %+v", i.Component.Name, i.Components)
+	if i.Component != nil || len(i.Components) != 1 || i.Components[0].ComponentID != shown.ID {
+		t.Fatalf("public incident components: main %+v, affected %+v", i.Component, i.Components)
 	}
 
 	var maintenances struct {

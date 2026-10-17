@@ -29,12 +29,12 @@ func TestCheckAllowsAll(t *testing.T) {
 func TestBackfillAffectedComponents(t *testing.T) {
 	db := testutil.NewDB(t)
 	c := testutil.CreateComponent(t, db, "API", "under_maintenance")
-	incident := models.Incident{Name: "old", Status: "resolved", ComponentID: c.ID}
+	incident := models.Incident{Name: "old", Status: "resolved", ComponentID: models.OptionalID(c.ID)}
 	if err := db.Create(&incident).Error; err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	m := models.Maintenance{Name: "old", Status: models.MaintenanceInProgress, ComponentID: c.ID,
+	m := models.Maintenance{Name: "old", Status: models.MaintenanceInProgress, ComponentID: models.OptionalID(c.ID),
 		StartAt: now, EndAt: now.Add(time.Hour), PreviousComponentStatus: "partial_outage"}
 	if err := db.Create(&m).Error; err != nil {
 		t.Fatal(err)
