@@ -111,6 +111,7 @@ func main() {
 		// Settings endpoints (public)
 		public.GET("/settings/theme", handlers.GetTheme(db))
 		public.GET("/settings/branding", handlers.GetBranding(db))
+		public.GET("/settings/customization", handlers.GetCustomization(db))
 
 		// Authentication endpoint (public - no JWT required, rate limited)
 		public.POST("/admin/login", middleware.LoginLimiter.Middleware(), handlers.Login(db, auditService))
@@ -182,6 +183,9 @@ func main() {
 
 			// Branding configuration
 			adminOnly.PUT("/settings/branding", handlers.UpdateBranding(db))
+
+			// Custom CSS, header and footer of the public page
+			adminOnly.PUT("/settings/customization", handlers.UpdateCustomization(db))
 
 			// Incident templates
 			adminOnly.POST("/templates", handlers.CreateTemplate(db))
