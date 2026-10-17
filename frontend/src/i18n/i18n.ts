@@ -58,9 +58,21 @@ function chosenLanguage(): string | null {
 // when the browser asks for a language the page does not have.
 export function applyPageLanguage(setting: LanguageSetting) {
   if (chosenLanguage()) return;
-  if (setting.mode === 'fixed' || !SUPPORTED.includes(i18n.language)) {
+  if (setting.mode === 'fixed' || !browserLanguage()) {
     i18n.changeLanguage(setting.default);
   }
+}
+
+// browserLanguage returns the first of the browser's languages the page
+// has, or null. It reads the browser itself: i18n.language cannot tell,
+// since i18next turns an unsupported language into its fallback, English.
+function browserLanguage(): string | null {
+  const wanted = navigator.languages?.length ? navigator.languages : [navigator.language];
+  for (const lng of wanted) {
+    const base = (lng || '').split('-')[0].toLowerCase();
+    if (SUPPORTED.includes(base)) return base;
+  }
+  return null;
 }
 
 export default i18n;

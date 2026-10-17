@@ -118,6 +118,13 @@ func TestSubscriptionLanguage(t *testing.T) {
 		t.Fatalf("unsupported language: %d", code)
 	}
 
+	// An unconfirmed subscriber subscribing again takes the new language.
+	call(t, r, http.MethodPost, "/subscribe", map[string]any{"email": "a@example.com", "locale": "en"})
+	db.First(&a, a.ID)
+	if a.Locale != "en" {
+		t.Fatalf("unconfirmed resubscribe kept %q", a.Locale)
+	}
+
 	// A confirmed subscriber subscribing again is told so in a field the
 	// page can translate.
 	if err := db.Model(&b).Update("confirmed", true).Error; err != nil {

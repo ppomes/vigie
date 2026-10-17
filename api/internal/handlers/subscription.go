@@ -126,7 +126,14 @@ func Subscribe(db *gorm.DB, emailService services.EmailService) gin.HandlerFunc 
 
 			// Exists but not confirmed: take the new choice of components, and
 			// resend the confirmation email (async, non-blocking)
+			// resend the confirmation email (async, non-blocking). The
+			// language is the new one too.
 			if err := db.Transaction(func(tx *gorm.DB) error {
+				if existingSubscriber.Locale != locale {
+					if err := tx.Model(&existingSubscriber).Update("locale", locale).Error; err != nil {
+						return err
+					}
+				}
 				return setSubscriptions(tx, &existingSubscriber, componentIDs)
 			}); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update subscription"})
