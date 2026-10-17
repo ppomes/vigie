@@ -326,7 +326,9 @@ func TestSourceTimezone(t *testing.T) {
 		t.Fatal(err)
 	}
 	src, dst := cachetSource(t), freshVigie(t)
-	src.Exec("INSERT INTO settings (name, value) VALUES ('app_timezone', 'Europe/Paris')")
+	if err := src.Exec("INSERT INTO settings (name, value) VALUES ('app_timezone', 'Europe/Paris')").Error; err != nil {
+		t.Fatal(err)
+	}
 	report, err := Import(Options{Source: src, Target: dst, SourceTimezone: paris})
 	if err != nil {
 		t.Fatal(err)
@@ -353,7 +355,9 @@ func TestSourceTimezone(t *testing.T) {
 
 func TestWarnsWhenCachetShowedAnotherZone(t *testing.T) {
 	src, dst := cachetSource(t), freshVigie(t)
-	src.Exec("INSERT INTO settings (name, value) VALUES ('app_timezone', 'Europe/Paris')")
+	if err := src.Exec("INSERT INTO settings (name, value) VALUES ('app_timezone', 'Europe/Paris')").Error; err != nil {
+		t.Fatal(err)
+	}
 	report, err := Import(Options{Source: src, Target: dst})
 	if err != nil {
 		t.Fatal(err)

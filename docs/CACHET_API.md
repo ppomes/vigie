@@ -73,8 +73,10 @@ Cachet 2.4.1.
   are kept.
 - **Dates have no zone, as in Cachet.** They are read and written in the
   zone set by `CACHET_API_TIMEZONE`, UTC by default. Set it to Cachet's
-  `APP_TIMEZONE` so that integrations see the same times as before. Dates
-  sent with an offset (RFC 3339) keep it.
+  `APP_TIMEZONE` so that integrations see the same times as before. A date
+  sent with an RFC 3339 offset is read at that instant, and is written back
+  in the API's zone, without an offset: `02:00+03:00` reads back as
+  `23:00:00` the day before when the zone is UTC.
 - **Groups created through this API** are visible to logged-in users only
   unless `visible=1` is sent, as in Cachet.
 - Metrics, subscribers, subscriptions and incident templates have no endpoint

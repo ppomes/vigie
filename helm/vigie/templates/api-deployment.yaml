@@ -12,6 +12,10 @@ spec:
       {{- include "vigie.api.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        # Restarts the pods when the configuration changes: envFrom is only
+        # read at start.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         {{- include "vigie.api.selectorLabels" . | nindent 8 }}
     spec:
