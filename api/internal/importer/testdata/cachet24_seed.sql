@@ -28,7 +28,7 @@ INSERT INTO taggables (tag_id, taggable_type, taggable_id, created_at, updated_a
 
 -- Passwords are PHP bcrypt hashes of "secret".
 INSERT INTO users (id, username, password, remember_token, email, api_key, active, level, created_at, updated_at, google_2fa_secret, welcomed) VALUES
-  (1, 'pierre', '$2y$10$BqFQR94/w2QY/r1Y6recn.xqBVuzzNRhbjklg0.7tFjngtZPUv2vi', NULL, 'Pierre@Acme.test', 'Ab3dEf6hIj9kLm2nOp5q', 1, 1, '2024-01-01 10:00:00', '2024-01-01 10:00:00', 'TOTPSECRET', 1),
+  (1, 'pierre', '$2y$10$BqFQR94/w2QY/r1Y6recn.xqBVuzzNRhbjklg0.7tFjngtZPUv2vi', NULL, 'Pierre@Acme.test', 'Ab3dEf6hIj9kLm2nOp5q', 1, 1, '2024-01-01 10:00:00', '2024-01-01 10:00:00', 'JBSWY3DPEHPK3PXP', 1),
   (2, 'bob', '$2y$10$BqFQR94/w2QY/r1Y6recn.xqBVuzzNRhbjklg0.7tFjngtZPUv2vi', NULL, 'bob@acme.test', 'Zz9yXw8vUt7sRq6pOn5m', 1, 2, '2024-01-01 10:00:00', '2024-01-01 10:00:00', NULL, 1),
   (3, 'admin', '$2y$10$BqFQR94/w2QY/r1Y6recn.xqBVuzzNRhbjklg0.7tFjngtZPUv2vi', NULL, 'root@acme.test', '', 1, 1, '2024-01-01 10:00:00', '2024-01-01 10:00:00', NULL, 1);
 

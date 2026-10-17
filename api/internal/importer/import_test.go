@@ -144,6 +144,9 @@ func TestImportCachet24(t *testing.T) {
 	if pierre.Role != models.RoleAdmin || bob.Role != models.RoleViewer || pierre.Email != "pierre@acme.test" {
 		t.Fatalf("users: pierre %+v, bob %+v", pierre, bob)
 	}
+	if pierre.TwoFactorSecret == nil || *pierre.TwoFactorSecret != "JBSWY3DPEHPK3PXP" || bob.TwoFactorEnabled() {
+		t.Fatalf("two-factor secrets: pierre %v, bob %v", pierre.TwoFactorSecret, bob.TwoFactorSecret)
+	}
 	if bcrypt.CompareHashAndPassword([]byte(pierre.Password), []byte("secret")) != nil {
 		t.Fatal("the Cachet password does not work in Vigie")
 	}
