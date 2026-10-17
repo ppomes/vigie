@@ -461,7 +461,7 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		}
 
 		// Reload incident with translations and component
-		db.Preload("Translations").Preload("Component").First(&incident, incident.ID)
+		db.Preload("Translations").Preload("Component").Preload("Components").First(&incident, incident.ID)
 
 		// Send notifications to subscribers (async, non-blocking), unless
 		// asked not to, or the incident is internal.
@@ -606,7 +606,7 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		}
 
 		// Reload incident with translations and component
-		db.Preload("Translations").Preload("Component").First(&incident, incident.ID)
+		db.Preload("Translations").Preload("Component").Preload("Components").First(&incident, incident.ID)
 
 		// Send notifications to subscribers (async, non-blocking)
 		if notificationService != nil && incident.Notifications && incident.Visible {

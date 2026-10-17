@@ -36,6 +36,14 @@ func SetComponentStatus(tx *gorm.DB, componentID uint, status string) error {
 	return tx.Model(&component).Update("status", status).Error
 }
 
+// otherActiveMaintenances selects the ids of the other in-progress
+// maintenances. It does not read maintenance_components, so it can be used
+// in an update of that table on MySQL.
+func otherActiveMaintenances(tx *gorm.DB, excludeMaintenanceID uint) *gorm.DB {
+	return tx.Session(&gorm.Session{NewDB: true}).Model(&models.Maintenance{}).Select("id").
+		Where("status = ? AND id <> ? AND deleted_at IS NULL", models.MaintenanceInProgress, excludeMaintenanceID)
+}
+
 // otherActivePreviousStatus looks for another in-progress maintenance
 // covering the component. It returns the status that maintenance recorded,
 // and whether there is one.
@@ -73,22 +81,26 @@ func EnterMaintenance(tx *gorm.DB, m *models.Maintenance) error {
 
 // EnterMaintenanceComponents puts the given components of m under
 // maintenance. When another maintenance is already in progress on a
-// component, the component is already under maintenance: m inherits the
+// component and the component is still under maintenance, m inherits the
 // status recorded by that maintenance, so the original status is restored
-// whichever ends last.
+// whichever ends last. When someone set the status explicitly in between,
+// that status is the one to restore, for every maintenance in progress.
 func EnterMaintenanceComponents(tx *gorm.DB, m *models.Maintenance, rows []models.MaintenanceComponent) error {
 	for i := range rows {
 		row := &rows[i]
-		previous, found, err := otherActivePreviousStatus(tx, row.ComponentID, m.ID)
-		if err != nil {
+		var component models.Component
+		if err := tx.First(&component, row.ComponentID).Error; err != nil {
 			return err
 		}
-		if !found {
-			var component models.Component
-			if err := tx.First(&component, row.ComponentID).Error; err != nil {
+		previous := component.Status
+		if previous == ComponentUnderMaintenance {
+			inherited, found, err := otherActivePreviousStatus(tx, row.ComponentID, m.ID)
+			if err != nil {
 				return err
 			}
-			previous = component.Status
+			if found {
+				previous = inherited
+			}
 		}
 		if previous == "" || previous == ComponentUnderMaintenance {
 			previous = ComponentOperational
@@ -96,6 +108,13 @@ func EnterMaintenanceComponents(tx *gorm.DB, m *models.Maintenance, rows []model
 		row.PreviousStatus = previous
 		if err := tx.Model(row).Update("previous_status", previous).Error; err != nil {
 			return err
+		}
+		if component.Status != ComponentUnderMaintenance {
+			if err := tx.Model(&models.MaintenanceComponent{}).
+				Where("component_id = ? AND maintenance_id IN (?)", row.ComponentID, otherActiveMaintenances(tx, m.ID)).
+				Update("previous_status", previous).Error; err != nil {
+				return err
+			}
 		}
 		if err := SetComponentStatus(tx, row.ComponentID, ComponentUnderMaintenance); err != nil {
 			return err

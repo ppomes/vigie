@@ -397,8 +397,8 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 		// Get active (in_progress) and upcoming (scheduled) maintenances
 		var maintenances []models.Maintenance
 		if err := db.Preload("Translations").
-			Preload("Component").Preload("Component.Translations", "locale = ?", locale).
-			Preload("Components", func(db *gorm.DB) *gorm.DB { return db.Order("id") }).
+			Preload("Component", publicComponents).Preload("Component.Translations", "locale = ?", locale).
+			Preload("Components", publicAffectedComponents).
 			Preload("Components.Component").Preload("Components.Component.Translations", "locale = ?", locale).
 			Where("status IN (?, ?) AND end_at > ?",
 				models.MaintenanceScheduled, models.MaintenanceInProgress, now).
@@ -433,7 +433,7 @@ func GetMaintenances(db *gorm.DB) gin.HandlerFunc {
 					names = append(names, getTranslationValue(mc.Component.Translations, "name", locale, mc.Component.Name))
 				}
 			}
-			if len(names) == 0 {
+			if len(names) == 0 && componentName != "" {
 				names = []string{componentName}
 			}
 

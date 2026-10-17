@@ -30,11 +30,15 @@ func TestBackfillAffectedComponents(t *testing.T) {
 	db := testutil.NewDB(t)
 	c := testutil.CreateComponent(t, db, "API", "under_maintenance")
 	incident := models.Incident{Name: "old", Status: "resolved", ComponentID: c.ID}
-	db.Create(&incident)
+	if err := db.Create(&incident).Error; err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now()
 	m := models.Maintenance{Name: "old", Status: models.MaintenanceInProgress, ComponentID: c.ID,
 		StartAt: now, EndAt: now.Add(time.Hour), PreviousComponentStatus: "partial_outage"}
-	db.Create(&m)
+	if err := db.Create(&m).Error; err != nil {
+		t.Fatal(err)
+	}
 
 	for i := 0; i < 2; i++ { // twice: the backfill is idempotent
 		if err := EnsureSchema(db); err != nil {

@@ -325,8 +325,12 @@ function MaintenancesList() {
             <p className="text-sm mb-2">{maintenance.message}</p>
           )}
           <div className="text-sm text-muted">
-            <span>{t('maintenances.component')}: {(maintenance.components?.length ? maintenance.components : [maintenance.component]).join(', ')}</span>
-            <span className="mx-2">|</span>
+            {(maintenance.components?.length || maintenance.component) && (
+              <>
+                <span>{t('maintenances.component')}: {(maintenance.components?.length ? maintenance.components : [maintenance.component]).join(', ')}</span>
+                <span className="mx-2">|</span>
+              </>
+            )}
             <span>{formatDate(maintenance.start_at)} - {formatDate(maintenance.end_at)}</span>
           </div>
         </div>

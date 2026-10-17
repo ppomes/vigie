@@ -179,3 +179,52 @@ func TestOverlappingMaintenancesOnDifferentSets(t *testing.T) {
 	call(t, r, http.MethodDelete, fmt.Sprintf("/maintenances/%d", m2), nil)
 	wantStatus(t, db, b.ID, "partial_outage")
 }
+
+func TestHiddenComponentsStayOffPublicIncidentsAndMaintenances(t *testing.T) {
+	db := testutil.NewDB(t)
+	r := newRouter(db)
+	shown := testutil.CreateComponent(t, db, "Website", "operational")
+	hidden := createdID(t, call(t, r, http.MethodPost, "/components", map[string]any{
+		"name": "Secret", "status": "operational", "enabled": false,
+	}), "component")
+	start, end := maintenanceWindow()
+
+	call(t, r, http.MethodPost, "/incidents", map[string]any{
+		"name": "Both", "status": "investigating",
+		"components": []map[string]any{{"component_id": hidden}, {"component_id": shown.ID}},
+	})
+	call(t, r, http.MethodPost, "/maintenances", map[string]any{
+		"name": "Both", "status": "scheduled", "component_ids": []uint{hidden, shown.ID}, "start_at": start, "end_at": end,
+	})
+	call(t, r, http.MethodPost, "/maintenances", map[string]any{
+		"name": "Hidden only", "status": "scheduled", "component_id": hidden, "start_at": start, "end_at": end,
+	})
+
+	var incidents struct {
+		Incidents []models.Incident `json:"incidents"`
+	}
+	get(t, r, "/public/incidents", &incidents)
+	if len(incidents.Incidents) != 1 {
+		t.Fatalf("public incidents: %d, want 1", len(incidents.Incidents))
+	}
+	i := incidents.Incidents[0]
+	if i.Component.Name != "" || len(i.Components) != 1 || i.Components[0].ComponentID != shown.ID {
+		t.Fatalf("public incident components: main %q, affected %+v", i.Component.Name, i.Components)
+	}
+
+	var maintenances struct {
+		Maintenances []struct {
+			Name       string   `json:"name"`
+			Component  string   `json:"component"`
+			Components []string `json:"components"`
+		} `json:"maintenances"`
+	}
+	get(t, r, "/public/maintenances", &maintenances)
+	got := map[string]string{}
+	for _, m := range maintenances.Maintenances {
+		got[m.Name] = m.Component + fmt.Sprint(m.Components)
+	}
+	if got["Both"] != "[Website]" || got["Hidden only"] != "[]" {
+		t.Fatalf("public maintenances: %v", got)
+	}
+}
