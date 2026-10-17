@@ -158,12 +158,17 @@ func CreateIncidentUpdate(db *gorm.DB, notificationService *services.Notificatio
 			return
 		}
 
-		incident, err = loadIncidentWithUpdates(db, incident.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload incident"})
-			return
+		// The update is committed: from here on, failures are logged and the
+		// response still reports success, so that clients do not retry and
+		// post the update twice.
+		if reloaded, err := loadIncidentWithUpdates(db, incident.ID); err != nil {
+			log.Printf("Incident update %d created, but reloading incident %d failed: %v", update.ID, incident.ID, err)
+		} else {
+			incident = reloaded
 		}
-		db.Preload("Translations").First(&update, update.ID)
+		if err := db.Preload("Translations").First(&update, update.ID).Error; err != nil {
+			log.Printf("Incident update %d created, but reloading it failed: %v", update.ID, err)
+		}
 
 		if notificationService != nil {
 			go func(incident models.Incident, update models.IncidentUpdate) {
