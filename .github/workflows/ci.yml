@@ -29,6 +29,38 @@ jobs:
       - run: go vet ./...
       - run: go test -race -count=1 ./...
 
+  import:
+    name: Cachet import (MySQL)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - name: Create the Cachet and Vigie databases
+        run: mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE cachet; CREATE DATABASE vigie"
+      - name: Import a Cachet 2.4 database into Vigie
+        env:
+          CACHET_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/cachet
+          VIGIE_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/vigie
+        run: go test -count=1 -v -run TestImportFromMySQL ./internal/importer/
+
   web:
     name: ${{ matrix.app }} (React)
     runs-on: ubuntu-latest

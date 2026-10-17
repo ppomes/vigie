@@ -63,6 +63,7 @@ vigie/
 - [API Reference](docs/API.md) - Full API documentation
 - [Kubernetes Deployment](docs/KUBERNETES.md) - Helm chart deployment guide
 - [Cachet compatible API](docs/CACHET_API.md) - For tools written for Cachet 2.x
+- [Importing from Cachet](docs/IMPORT_CACHET.md) - Move a Cachet 2.4 installation to Vigie
 
 ## Docker Commands
 
