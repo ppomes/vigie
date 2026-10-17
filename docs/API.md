@@ -254,7 +254,7 @@ POST /subscribe
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | Valid email address |
-| `locale` | string | No | Preferred language (`en` or `fr`). Default: `en` |
+| `locale` | string | No | Language of the emails (`en` or `fr`). Default: the page's default language |
 
 **Response (201):**
 
@@ -338,6 +338,24 @@ GET /settings/branding
 ```
 
 ---
+
+#### Get Language Setting
+
+Returns how the public page picks a visitor's language before they choose one
+with the switcher: `fixed` shows `default`; `browser` follows the browser, and
+`default` when the browser asks for a language the page does not have. Unset,
+it is `{"default": "en", "mode": "browser"}`.
+
+```
+GET /settings/language
+```
+
+```json
+{
+  "default": "fr",
+  "mode": "fixed"
+}
+```
 
 #### Get Customization
 
@@ -1101,6 +1119,17 @@ PUT /admin/settings/:key
   "value": "dark"
 }
 ```
+
+#### Update Language Setting
+
+**Admin only**
+
+```
+PUT /admin/settings/language
+```
+
+Takes the same fields as [Get Language Setting](#get-language-setting).
+`default` is `en` or `fr`, `mode` is `fixed` or `browser`.
 
 #### Update Customization
 

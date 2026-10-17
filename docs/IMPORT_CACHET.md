@@ -64,7 +64,9 @@ Ids are kept so that monitoring scripts, which address components by id,
 keep working, through the Cachet compatible API.
 
 Cachet's text is single-language. It is stored in the import locale; add the
-other language in the admin where needed.
+other language in the admin where needed. The import also sets the public
+page's default language to the import locale, in "always the default
+language" mode, unless Vigie already has a language setting.
 
 ## What the report lists
 

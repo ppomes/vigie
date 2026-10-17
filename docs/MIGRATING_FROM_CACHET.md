@@ -54,7 +54,10 @@ Pay attention to:
 - **Two-factor login** carries over. Users who had it make recovery codes from
   their profile.
 - **Text language**: Cachet's text is stored in one language. Use `--locale`
-  if `app_locale` is not the language of your incidents.
+  if `app_locale` is not the language of your incidents. The public page is
+  set to show that language to every visitor, so pages do not mix languages;
+  visitors can still switch. Change it under Settings, Public Page Language
+  once incidents are written in both languages.
 - **Timezone**: Cachet stores its dates in the zone of `APP_TIMEZONE`, in its
   `.env` file, not in its database. If it is not `UTC`, add
   `--source-timezone` with that value, for example
