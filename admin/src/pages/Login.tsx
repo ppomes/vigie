@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, APIError } from '../lib/api';
 
 interface PasswordValidation {
   minLength: boolean;
@@ -31,6 +31,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Second step for users with two-factor login
+  const [needCode, setNeedCode] = useState(false);
+  const [code, setCode] = useState('');
+
   // Force password change state
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [tempPassword, setTempPassword] = useState('');
@@ -56,9 +60,14 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { token, user, force_password_change } = await api.login(username, password);
+      const { token, user, force_password_change, recovery_codes_left } =
+        await api.login(username, password, needCode ? code : undefined);
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
+
+      if (recovery_codes_left !== undefined) {
+        alert(`You logged in with a recovery code. ${recovery_codes_left} left: make new ones from "Two-Factor Login" if you are running out.`);
+      }
 
       if (force_password_change) {
         // Store the password for the change request
@@ -68,7 +77,12 @@ export default function Login() {
         navigate('/');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      if (err instanceof APIError && err.data.two_factor_required && !needCode) {
+        // Password accepted: ask for the code.
+        setNeedCode(true);
+      } else {
+        setError(err instanceof Error ? err.message : 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -194,6 +208,44 @@ export default function Login() {
           </div>
         )}
 
+        {needCode && (
+          <form onSubmit={handleSubmit}>
+            <p className="text-gray-600 mb-4">
+              Enter the code from your authenticator app, or one of your recovery codes.
+            </p>
+            <div className="mb-6">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Code
+              </label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 tracking-widest"
+                autoComplete="one-time-code"
+                inputMode="text"
+                autoFocus
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 disabled:opacity-50"
+            >
+              {loading ? 'Checking...' : 'Verify'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setNeedCode(false); setCode(''); setPassword(''); setError(''); }}
+              className="w-full mt-2 text-sm text-gray-500 hover:text-gray-700"
+            >
+              Back
+            </button>
+          </form>
+        )}
+
+        {!needCode && (
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2">
@@ -235,6 +287,7 @@ export default function Login() {
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
+        )}
       </div>
     </div>
   );

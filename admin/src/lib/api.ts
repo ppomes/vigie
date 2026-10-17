@@ -1,5 +1,17 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
+// APIError keeps the JSON body of a failed request, for callers that need
+// more than the message (such as two_factor_required on login).
+export class APIError extends Error {
+  status: number;
+  data: Record<string, unknown>;
+  constructor(message: string, status: number, data: Record<string, unknown>) {
+    super(message);
+    this.status = status;
+    this.data = data;
+  }
+}
+
 // Public API fetch (no auth required, no redirect on 401)
 async function fetchPublicAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_URL}${endpoint}`, {
@@ -12,7 +24,7 @@ async function fetchPublicAPI<T>(endpoint: string, options: RequestInit = {}): P
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    throw new APIError(error.error || `HTTP ${response.status}`, response.status, error);
   }
 
   return response.json();
@@ -47,6 +59,13 @@ export interface LoginResponse {
   token: string;
   user: { id: number; username: string; email: string; role: 'admin' | 'viewer' };
   force_password_change: boolean;
+  recovery_codes_left?: number;
+}
+
+export interface TwoFactorSetup {
+  secret: string;
+  otpauth_url: string;
+  qr_code: string;
 }
 
 export interface User {
@@ -57,6 +76,8 @@ export interface User {
   active: boolean;
   last_login?: string;
   created_at: string;
+  two_factor_enabled: boolean;
+  recovery_codes_left?: number;
 }
 
 export interface APIKey {
@@ -243,10 +264,10 @@ export interface TemplatePreview {
 }
 
 export const api = {
-  login: (username: string, password: string) =>
+  login: (username: string, password: string, code?: string) =>
     fetchPublicAPI<LoginResponse>('/admin/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify(code ? { username, password, code } : { username, password }),
     }),
 
   forgotPassword: (email: string) =>
@@ -357,6 +378,18 @@ export const api = {
 
   // User management (admin only)
   getUsers: () => fetchAPI<{ users: User[] }>('/admin/users').then(r => r.users || []),
+  setupTwoFactor: (password: string) =>
+    fetchAPI<TwoFactorSetup>('/admin/me/two-factor/setup', { method: 'POST', body: JSON.stringify({ password }) }),
+  enableTwoFactor: (code: string) =>
+    fetchAPI<{ recovery_codes: string[] }>('/admin/me/two-factor/enable', { method: 'POST', body: JSON.stringify({ code }) })
+      .then(r => r.recovery_codes),
+  disableTwoFactor: (password: string) =>
+    fetchAPI<{ message: string }>('/admin/me/two-factor/disable', { method: 'POST', body: JSON.stringify({ password }) }),
+  regenerateRecoveryCodes: (password: string) =>
+    fetchAPI<{ recovery_codes: string[] }>('/admin/me/two-factor/recovery-codes', { method: 'POST', body: JSON.stringify({ password }) })
+      .then(r => r.recovery_codes),
+  resetUserTwoFactor: (id: number) =>
+    fetchAPI<{ message: string }>(`/admin/users/${id}/two-factor`, { method: 'DELETE' }),
   getUser: (id: number) => fetchAPI<{ user: User }>(`/admin/users/${id}`).then(r => r.user),
   createUser: (data: { username: string; email: string; password: string; role: 'admin' | 'viewer' }) =>
     fetchAPI<{ user: User }>('/admin/users', { method: 'POST', body: JSON.stringify(data) }).then(r => r.user),
