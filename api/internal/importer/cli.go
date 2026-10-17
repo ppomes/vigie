@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
+	// The zone database, for --source-timezone: the API image has none.
+	_ "time/tzdata"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
@@ -13,7 +16,7 @@ import (
 )
 
 // Usage explains the import-cachet command.
-const Usage = `Usage: api import-cachet --source-driver mysql|sqlite --source-dsn DSN [--dry-run] [--locale en|fr]
+const Usage = `Usage: api import-cachet --source-driver mysql|sqlite --source-dsn DSN [--dry-run] [--locale en|fr] [--source-timezone ZONE]
 
 Copies a Cachet 2.4 installation into this Vigie database, which must be a
 fresh installation. The Vigie database is the one the API is configured with
@@ -24,6 +27,8 @@ fresh installation. The Vigie database is the one the API is configured with
                    SQLite: path to the database file
   --dry-run        do everything in a transaction, print the report, roll back
   --locale         locale for Cachet's text (default: Cachet's app_locale, else en)
+  --source-timezone  zone Cachet wrote its dates in: APP_TIMEZONE in Cachet's
+                   .env, for example Europe/Paris (default: UTC)
 `
 
 // openSource opens the Cachet database, read-only where the driver allows.
@@ -57,6 +62,7 @@ func RunCLI(args []string, target func() (*gorm.DB, error), out io.Writer) int {
 	dsn := fs.String("source-dsn", "", "")
 	dryRun := fs.Bool("dry-run", false, "")
 	locale := fs.String("locale", "", "")
+	zoneName := fs.String("source-timezone", "UTC", "")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -66,6 +72,12 @@ func RunCLI(args []string, target func() (*gorm.DB, error), out io.Writer) int {
 	}
 	if *locale != "" && *locale != "en" && *locale != "fr" {
 		fmt.Fprintln(out, "--locale must be en or fr")
+		return 2
+	}
+
+	zone, err := time.LoadLocation(*zoneName)
+	if err != nil {
+		fmt.Fprintf(out, "--source-timezone: unknown zone %q: use an IANA name such as Europe/Paris\n", *zoneName)
 		return 2
 	}
 
@@ -84,7 +96,7 @@ func RunCLI(args []string, target func() (*gorm.DB, error), out io.Writer) int {
 		return 1
 	}
 
-	report, err := Import(Options{Source: src, Target: dst, DryRun: *dryRun, Locale: *locale})
+	report, err := Import(Options{Source: src, Target: dst, DryRun: *dryRun, Locale: *locale, SourceTimezone: zone})
 	if err != nil {
 		fmt.Fprintf(out, "Import failed, nothing was written: %v\n", err)
 		return 1

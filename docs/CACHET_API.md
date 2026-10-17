@@ -25,7 +25,8 @@ working. A key acts with the role of its user: writes need an admin.
 
 Reads need no key, as in Cachet. Anonymous readers see what the public page
 shows: enabled components, public groups, visible incidents. With a key, they
-see everything. A wrong key is refused rather than ignored.
+see everything, except in a group's `enabled_components`, which only lists
+enabled components, as in Cachet. A wrong key is refused rather than ignored.
 
 ## Endpoints
 

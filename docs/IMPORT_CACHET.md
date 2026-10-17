@@ -28,6 +28,7 @@ docker compose exec api ./api import-cachet \
 | `--source-dsn` | MySQL: `user:password@tcp(host:3306)/database`. SQLite: path to the file |
 | `--dry-run` | Run the whole import in a transaction, print the report, roll back |
 | `--locale` | `en` or `fr`: the language of Cachet's text. Defaults to Cachet's `app_locale`, else `en` |
+| `--source-timezone` | The zone Cachet wrote its dates in, for example `Europe/Paris`: `APP_TIMEZONE` in Cachet's `.env`. Defaults to `UTC`, Cachet's default |
 
 PostgreSQL sources are not supported yet: export the Cachet database to MySQL
 or SQLite first.

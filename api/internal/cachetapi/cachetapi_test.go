@@ -271,7 +271,7 @@ func TestSchedulesHideHiddenComponentsFromAnonymousReaders(t *testing.T) {
 	}
 }
 
-func TestAuthenticatedGroupReadsIncludeDisabledComponents(t *testing.T) {
+func TestGroupsListOnlyEnabledComponents(t *testing.T) {
 	r, db := setup(t)
 	g := data(t, send(t, r, http.MethodPost, "/components/groups", map[string]any{"name": "Web", "visible": 1}, true))
 	gid := uint(num(g["id"]))
@@ -280,11 +280,21 @@ func TestAuthenticatedGroupReadsIncludeDisabledComponents(t *testing.T) {
 		db.Model(&comp).UpdateColumns(map[string]any{"group_id": gid, "enabled": enabled})
 	}
 	path := "/components/groups/" + itoa(int(gid))
-	if n := len(data(t, send(t, r, http.MethodGet, path, nil, true))["enabled_components"].([]any)); n != 2 {
-		t.Fatalf("components seen with a key: %d, want 2", n)
+	// As in Cachet, even with a key.
+	if n := len(data(t, send(t, r, http.MethodGet, path, nil, true))["enabled_components"].([]any)); n != 1 {
+		t.Fatalf("components seen with a key: %d, want 1", n)
 	}
 	if n := len(data(t, send(t, r, http.MethodGet, path, nil, false))["enabled_components"].([]any)); n != 1 {
 		t.Fatalf("components seen anonymously: %d, want 1", n)
+	}
+}
+
+func TestUngroupedComponentHasGroupZero(t *testing.T) {
+	r, db := setup(t)
+	comp := testutil.CreateComponent(t, db, "Alone", "operational")
+	c := data(t, send(t, r, http.MethodGet, "/components/"+itoa(int(comp.ID)), nil, false))
+	if g, ok := c["group_id"].(float64); !ok || g != 0 {
+		t.Fatalf("group_id %v (%T), want 0 as in Cachet", c["group_id"], c["group_id"])
 	}
 }
 
