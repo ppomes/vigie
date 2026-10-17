@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"api/internal/language"
 	"api/internal/models"
 	"api/internal/services"
 
@@ -55,10 +56,16 @@ func Subscribe(db *gorm.DB, emailService services.EmailService) gin.HandlerFunc 
 			return
 		}
 
-		// Validate and default locale
+		// The language of the emails: the subscriber's choice, else the
+		// page's default language.
 		locale := strings.ToLower(strings.TrimSpace(req.Locale))
-		if locale != "en" && locale != "fr" {
-			locale = "en"
+		if !language.IsSupported(locale) {
+			site, _, err := language.Load(db)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load the language setting"})
+				return
+			}
+			locale = site.Default
 		}
 
 		// Check if subscriber already exists (including soft-deleted)
@@ -328,6 +335,9 @@ type SubscriptionChoice struct {
 	Email        string `json:"email,omitempty"`
 	Global       bool   `json:"global"`
 	ComponentIDs []uint `json:"component_ids"`
+	// Locale is the language of the subscriber's emails. On update, empty
+	// keeps it.
+	Locale string `json:"locale,omitempty"`
 }
 
 // findSubscriberByToken loads the subscriber behind the token sent in each
@@ -352,7 +362,7 @@ func findSubscriberByToken(c *gin.Context, db *gorm.DB) (models.Subscriber, bool
 }
 
 func subscriptionChoice(db *gorm.DB, subscriber models.Subscriber) (SubscriptionChoice, error) {
-	choice := SubscriptionChoice{Email: subscriber.Email, Global: subscriber.Global, ComponentIDs: []uint{}}
+	choice := SubscriptionChoice{Email: subscriber.Email, Global: subscriber.Global, ComponentIDs: []uint{}, Locale: subscriber.Locale}
 	if !subscriber.Global {
 		err := db.Model(&models.Subscription{}).Where("subscriber_id = ?", subscriber.ID).
 			Order("component_id").Pluck("component_id", &choice.ComponentIDs).Error
@@ -393,6 +403,11 @@ func UpdateSubscription(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format", "details": err.Error()})
 			return
 		}
+		locale := strings.ToLower(strings.TrimSpace(req.Locale))
+		if locale != "" && !language.IsSupported(locale) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported language"})
+			return
+		}
 		ids := []uint{}
 		if !req.Global {
 			var msg string
@@ -411,7 +426,15 @@ func UpdateSubscription(db *gorm.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		if err := db.Transaction(func(tx *gorm.DB) error { return setSubscriptions(tx, &subscriber, ids) }); err != nil {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			if locale != "" && locale != subscriber.Locale {
+				if err := tx.Model(&subscriber).Update("locale", locale).Error; err != nil {
+					return err
+				}
+			}
+			return setSubscriptions(tx, &subscriber, ids)
+		})
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save subscription"})
 			return
 		}

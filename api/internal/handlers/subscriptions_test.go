@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"api/internal/language"
 	"api/internal/models"
 	"api/internal/testutil"
 )
@@ -72,5 +73,47 @@ func TestManageSubscription(t *testing.T) {
 	}
 	if code := status(t, r, http.MethodGet, "/subscriptions?token=nope", nil); code != http.StatusNotFound {
 		t.Fatalf("unknown token: status %d, want %d", code, http.StatusNotFound)
+	}
+}
+
+func TestSubscriptionLanguage(t *testing.T) {
+	db := testutil.NewDB(t)
+	r := newRouter(db)
+
+	// Without a choice, the subscriber gets the page's default language.
+	if err := language.Save(db, language.Settings{Default: "fr", Mode: language.ModeFixed}); err != nil {
+		t.Fatal(err)
+	}
+	call(t, r, http.MethodPost, "/subscribe", map[string]any{"email": "a@example.com"})
+	call(t, r, http.MethodPost, "/subscribe", map[string]any{"email": "b@example.com", "locale": "en"})
+	var a, b models.Subscriber
+	db.Where("email = ?", "a@example.com").First(&a)
+	db.Where("email = ?", "b@example.com").First(&b)
+	if a.Locale != "fr" || b.Locale != "en" {
+		t.Fatalf("locales: a %q, b %q", a.Locale, b.Locale)
+	}
+
+	// The manage page shows the language and can change it.
+	if err := db.Model(&b).Update("unsubscribe_token", "tok").Error; err != nil {
+		t.Fatal(err)
+	}
+	var choice SubscriptionChoice
+	get(t, r, "/subscriptions?token=tok", &choice)
+	if choice.Locale != "en" {
+		t.Fatalf("choice: %+v", choice)
+	}
+	call(t, r, http.MethodPut, "/subscriptions?token=tok", map[string]any{"global": true, "locale": "fr"})
+	get(t, r, "/subscriptions?token=tok", &choice)
+	if choice.Locale != "fr" {
+		t.Fatalf("after update: %+v", choice)
+	}
+	// Without a locale, an update keeps it.
+	call(t, r, http.MethodPut, "/subscriptions?token=tok", map[string]any{"global": true})
+	get(t, r, "/subscriptions?token=tok", &choice)
+	if choice.Locale != "fr" {
+		t.Fatalf("update without locale: %+v", choice)
+	}
+	if code := status(t, r, http.MethodPut, "/subscriptions?token=tok", map[string]any{"global": true, "locale": "de"}); code != http.StatusBadRequest {
+		t.Fatalf("unsupported language: %d", code)
 	}
 }
