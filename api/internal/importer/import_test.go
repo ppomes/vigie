@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"api/internal/customization"
+	"api/internal/language"
 	"api/internal/models"
 	"api/internal/testutil"
 
@@ -255,6 +256,9 @@ func TestImportCachet24(t *testing.T) {
 	json.Unmarshal([]byte(branding.Value), &b)
 	if b["title_en"] != "Acme Status" || b["logo"] != "data:image/png;base64,iVBORw0KGgo=" {
 		t.Fatalf("branding: %q", branding.Value)
+	}
+	if lang, _, err := language.Load(dst); err != nil || lang != (language.Settings{Default: "fr", Mode: language.ModeFixed}) {
+		t.Errorf("page language: %+v, %v", lang, err)
 	}
 	custom, err := customization.Load(dst)
 	if err != nil {

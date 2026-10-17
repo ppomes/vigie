@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"api/internal/language"
 	"api/internal/models"
 	"api/internal/totp"
 
@@ -707,7 +708,7 @@ func (im *importer) applySettings() error {
 		im.report.note("The Cachet \"about\" text has no equivalent in Vigie and was not imported.")
 	}
 	im.report.note("Text from Cachet was stored in %q: add the other language in the admin where needed.", im.locale)
-	return nil
+	return im.pageLanguage()
 }
 
 // leftovers reports Cachet data the importer does not bring over.
@@ -745,4 +746,25 @@ func (im *importer) checkZone() {
 	if tz := im.settings["app_timezone"]; tz != "" && tz != "UTC" {
 		im.report.note("Cachet's dates were read as UTC, but Cachet showed them in %s. If Cachet's .env sets APP_TIMEZONE to anything but UTC, run the import again with --source-timezone set to that value.", tz)
 	}
+}
+
+// pageLanguage shows the public page in the language of Cachet's text,
+// whatever the visitor's browser, since that text exists in no other
+// language. Visitors can still switch.
+func (im *importer) pageLanguage() error {
+	_, exists, err := language.Load(im.dst)
+	if err != nil {
+		return err
+	}
+	if exists {
+		im.report.note("Vigie already has a page language setting: it was kept. Cachet's text is in %q.", im.locale)
+		return nil
+	}
+	if err := language.Save(im.dst, language.Settings{Default: im.locale, Mode: language.ModeFixed}); err != nil {
+		return err
+	}
+	im.report.imported("settings")
+	im.report.note("The public page now shows %q to every visitor, the language of Cachet's text; visitors can switch. "+
+		"Once incidents are written in both languages, choose \"Follow the browser\" under Settings, Public page language.", im.locale)
+	return nil
 }
