@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
@@ -28,6 +29,9 @@ var cachetColours = []struct {
 	{"style_oranges", []string{"--color-investigating"}},
 }
 
+// cachetStylesUnmapped are Cachet style settings Vigie has no equivalent for.
+var cachetStylesUnmapped = []string{"style_greys", "style_metrics", "style_banner_padding", "style_fullwidth_header"}
+
 // cssColour accepts the colour values Cachet's colour pickers write, and
 // nothing that could end the CSS declaration.
 var cssColour = regexp.MustCompile(`^(#[0-9a-fA-F]{3,8}|[a-zA-Z]+|rgba?\([0-9., %]+\))$`)
@@ -35,6 +39,11 @@ var cssColour = regexp.MustCompile(`^(#[0-9a-fA-F]{3,8}|[a-zA-Z]+|rgba?\([0-9., 
 // customizationFromCachet builds Vigie's custom CSS, header and footer from
 // Cachet's settings, and reports what needs a look.
 func (im *importer) customizationFromCachet() error {
+	for _, name := range cachetStylesUnmapped {
+		if v := strings.TrimSpace(im.settings[name]); v != "" {
+			im.report.skip("style setting with no equivalent in Vigie (redo it in the custom CSS if needed)", name+" = "+v)
+		}
+	}
 	var css strings.Builder
 	var colours []string
 	for _, c := range cachetColours {
@@ -110,6 +119,10 @@ func (im *importer) cachetBanner() string {
 	case "image/png", "image/jpeg", "image/jpg", "image/gif", "image/svg+xml", "image/webp":
 	default:
 		im.report.skip("banner image (type not supported by Vigie's logo)", mime)
+		return ""
+	}
+	if data, err := base64.StdEncoding.DecodeString(banner); err != nil || len(data) == 0 {
+		im.report.skip("banner image (not valid base64)", "app_banner")
 		return ""
 	}
 	logo := "data:" + mime + ";base64," + banner

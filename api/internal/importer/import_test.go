@@ -273,6 +273,9 @@ func TestImportCachet24(t *testing.T) {
 	if len(report.Adapted["custom HTML changed by sanitizing: scripts, event handlers, forms and frames are not allowed; check it in the admin"]) != 1 {
 		t.Errorf("adapted: %v", report.Adapted)
 	}
+	if len(report.Skipped["style setting with no equivalent in Vigie (redo it in the custom CSS if needed)"]) != 1 {
+		t.Errorf("unmapped styles: %v", report.Skipped)
+	}
 	if len(report.Skipped["colour setting with an unexpected value (style_reds)"]) != 1 {
 		t.Errorf("skipped: %v", report.Skipped)
 	}
@@ -395,5 +398,26 @@ func TestWarnsWhenCachetShowedAnotherZone(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(report.Notes, "\n"), "--source-timezone") {
 		t.Fatalf("notes %q do not suggest --source-timezone", report.Notes)
+	}
+}
+
+func TestInvalidBannerIsSkipped(t *testing.T) {
+	src, dst := cachetSource(t), freshVigie(t)
+	if err := src.Exec("UPDATE settings SET value = 'not-base64!' WHERE name = 'app_banner'").Error; err != nil {
+		t.Fatal(err)
+	}
+	report, err := Import(Options{Source: src, Target: dst})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Skipped["banner image (not valid base64)"]) != 1 {
+		t.Fatalf("skipped: %v", report.Skipped)
+	}
+	var branding models.Settings
+	if err := dst.Where(&models.Settings{Key: "branding"}).First(&branding).Error; err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(branding.Value, "not-base64") {
+		t.Fatalf("branding: %s", branding.Value)
 	}
 }

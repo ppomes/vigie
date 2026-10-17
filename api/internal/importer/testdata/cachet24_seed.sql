@@ -6,6 +6,7 @@ INSERT INTO settings (name, value, created_at, updated_at) VALUES
   ('app_domain', 'https://status.acme.test', '2024-01-01 10:00:00', '2024-01-01 10:00:00'),
   ('app_locale', 'fr', '2024-01-01 10:00:00', '2024-01-01 10:00:00'),
   ('app_about', 'About Acme', '2024-01-01 10:00:00', '2024-01-01 10:00:00'),
+  ('style_metrics', '#0DCCC0', '2024-01-01 10:00:00', '2024-01-01 10:00:00'),
   ('style_greens', '#00AA55', '2024-01-01 10:00:00', '2024-01-01 10:00:00'),
   ('style_background_color', '#F0F3F4', '2024-01-01 10:00:00', '2024-01-01 10:00:00'),
   ('style_reds', 'red;} body{display:none', '2024-01-01 10:00:00', '2024-01-01 10:00:00'),

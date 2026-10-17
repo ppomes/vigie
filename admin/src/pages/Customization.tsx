@@ -8,11 +8,17 @@ const empty: Customization = { css: '', header_html: '', footer_html: '' };
 export default function CustomizationSection() {
   const [form, setForm] = useState<Customization>(empty);
   const [saving, setSaving] = useState(false);
+  // The form stays disabled until the saved values arrive, so an early save
+  // cannot wipe them and a late load cannot overwrite edits.
+  const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
 
   useEffect(() => {
     api.getCustomization()
-      .then(setForm)
+      .then(c => {
+        setForm(c);
+        setLoaded(true);
+      })
       .catch(err => setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to load the customization' }));
   }, []);
 
@@ -48,29 +54,31 @@ export default function CustomizationSection() {
       {message && <div className={`p-4 rounded mb-4 ${colors[message.type]}`}>{message.text}</div>}
 
       <form onSubmit={save} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Custom CSS</label>
-          <textarea value={form.css} onChange={e => setForm({ ...form, css: e.target.value })} rows={10} className={area}
-            placeholder=".card { border-radius: 0; }" spellCheck={false} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Header HTML</label>
-          <textarea value={form.header_html} onChange={e => setForm({ ...form, header_html: e.target.value })} rows={5} className={area}
-            placeholder='<a href="https://example.com">Back to example.com</a>' spellCheck={false} />
-          <p className="text-xs text-gray-500 mt-1">Shown above the page.</p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Footer HTML</label>
-          <textarea value={form.footer_html} onChange={e => setForm({ ...form, footer_html: e.target.value })} rows={5} className={area}
-            spellCheck={false} />
-          <p className="text-xs text-gray-500 mt-1">
-            Shown below the page. Links, images, text formatting and inline styles are allowed; scripts, event
-            handlers, forms and frames are removed.
-          </p>
-        </div>
-        <button type="submit" disabled={saving} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50">
-          {saving ? 'Saving...' : 'Save Customization'}
-        </button>
+        <fieldset disabled={!loaded} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Custom CSS</label>
+            <textarea value={form.css} onChange={e => setForm({ ...form, css: e.target.value })} rows={10} className={area}
+              placeholder=".card { border-radius: 0; }" spellCheck={false} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Header HTML</label>
+            <textarea value={form.header_html} onChange={e => setForm({ ...form, header_html: e.target.value })} rows={5} className={area}
+              placeholder='<a href="https://example.com">Back to example.com</a>' spellCheck={false} />
+            <p className="text-xs text-gray-500 mt-1">Shown above the page.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Footer HTML</label>
+            <textarea value={form.footer_html} onChange={e => setForm({ ...form, footer_html: e.target.value })} rows={5} className={area}
+              spellCheck={false} />
+            <p className="text-xs text-gray-500 mt-1">
+              Shown below the page. Links, images, text formatting and inline styles are allowed; scripts, event
+              handlers, forms and frames are removed.
+            </p>
+          </div>
+          <button type="submit" disabled={saving || !loaded} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50">
+            {saving ? 'Saving...' : loaded ? 'Save Customization' : 'Loading...'}
+          </button>
+        </fieldset>
       </form>
     </div>
   );
