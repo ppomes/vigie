@@ -36,6 +36,8 @@ func newRouter(db *gorm.DB) *gin.Engine {
 	r.PUT("/incidents/:id/updates/:update_id", UpdateIncidentUpdate(db))
 	r.DELETE("/incidents/:id/updates/:update_id", DeleteIncidentUpdate(db))
 	r.GET("/public/incidents", GetIncidents(db))
+	r.GET("/public/status", GetStatus(db))
+	r.GET("/incidents", ListIncidents(db))
 	r.POST("/maintenances", CreateMaintenance(db, nil))
 	r.PUT("/maintenances/:id", UpdateMaintenance(db, nil))
 	r.DELETE("/maintenances/:id", DeleteMaintenance(db))

@@ -20,7 +20,7 @@ const themes = [
   { id: 'modern', name: 'Modern', description: 'Gradient accents, rounded cards', preview: 'bg-gradient-to-r from-indigo-500 to-purple-500' },
 ];
 
-const emptyComponentForm = { name: '', status: 'operational', order: 0, group_id: 0 };
+const emptyComponentForm = { name: '', status: 'operational', order: 0, group_id: 0, link: '', enabled: true, tags: '' };
 
 function ComponentsPage() {
   const [components, setComponents] = useState<Component[]>([]);
@@ -45,11 +45,12 @@ function ComponentsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // group_id 0 means "no group"
+      // group_id 0 means "no group"; tags are typed comma-separated
+      const data = { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) };
       if (editId) {
-        await api.updateComponent(editId, form);
+        await api.updateComponent(editId, data);
       } else {
-        await api.createComponent(form);
+        await api.createComponent(data);
       }
       setShowForm(false);
       setEditId(null);
@@ -61,7 +62,10 @@ function ComponentsPage() {
   };
 
   const handleEdit = (c: Component) => {
-    setForm({ name: c.name, status: c.status, order: c.order, group_id: c.group_id || 0 });
+    setForm({
+      name: c.name, status: c.status, order: c.order, group_id: c.group_id || 0,
+      link: c.link || '', enabled: c.enabled, tags: (c.tags || []).map(t => t.name).join(', '),
+    });
     setEditId(c.id);
     setShowForm(true);
   };
@@ -101,6 +105,14 @@ function ComponentsPage() {
               <option value={0}>No group</option>
               {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
+            <input type="url" placeholder="Link (https://...)" value={form.link} onChange={e => setForm({...form, link: e.target.value})}
+              className="border rounded px-3 py-2 col-span-2" maxLength={1024} />
+            <input type="text" placeholder="Tags, comma-separated" value={form.tags} onChange={e => setForm({...form, tags: e.target.value})}
+              className="border rounded px-3 py-2" />
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={form.enabled} onChange={e => setForm({...form, enabled: e.target.checked})} />
+              Shown on the status page
+            </label>
           </div>
           <div className="mt-4 flex gap-2">
             <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
@@ -126,7 +138,11 @@ function ComponentsPage() {
         <tbody>
           {components.map(c => (
             <tr key={c.id}>
-              <td className="border p-2">{c.name}</td>
+              <td className="border p-2">
+                {c.name}
+                {!c.enabled && <span className="ml-2 text-xs px-2 py-1 rounded bg-gray-200 text-gray-600">hidden</span>}
+                {(c.tags || []).map(t => <span key={t.id} className="ml-1 text-xs px-2 py-1 rounded bg-blue-50 text-blue-700">{t.name}</span>)}
+              </td>
               <td className="border p-2">{c.status}</td>
               <td className="border p-2">{c.order}</td>
               <td className="border p-2">{groups.find(g => g.id === c.group_id)?.name || '-'}</td>
@@ -277,6 +293,11 @@ interface IncidentForm {
   component_id: number;
   // Empty means "leave the component status as it is"
   component_status: string;
+  visible: boolean;
+  stickied: boolean;
+  // datetime-local value; empty means "now" on creation
+  occurred_at: string;
+  notify: boolean;
   name_en: string;
   name_fr: string;
   message_en: string;
@@ -288,6 +309,10 @@ const defaultIncidentForm: IncidentForm = {
   status: 'investigating',
   component_id: 0,
   component_status: '',
+  visible: true,
+  stickied: false,
+  occurred_at: '',
+  notify: true,
   name_en: '',
   name_fr: '',
   message_en: '',
@@ -403,6 +428,56 @@ function IncidentTimeline({ incident, onChange }: { incident: Incident; onChange
   );
 }
 
+// Converts an API timestamp to a datetime-local input value, in local time.
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Optional incident fields, as sent to the API. notify only applies on creation.
+function incidentOptions(form: IncidentForm, creating: boolean) {
+  return {
+    visible: form.visible,
+    stickied: form.stickied,
+    occurred_at: form.occurred_at ? new Date(form.occurred_at).toISOString() : null,
+    notify: creating ? form.notify : undefined,
+  };
+}
+
+function IncidentOptionsFields({ form, setForm, creating }: {
+  form: IncidentForm;
+  setForm: (f: IncidentForm) => void;
+  creating: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Started at</label>
+        <input type="datetime-local" value={form.occurred_at} onChange={e => setForm({...form, occurred_at: e.target.value})}
+          className="w-full border rounded px-3 py-2" />
+        <p className="text-xs text-gray-500 mt-1">Leave empty for now.</p>
+      </div>
+      <div className="space-y-1 pt-6">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={form.visible} onChange={e => setForm({...form, visible: e.target.checked})} />
+          Shown on the status page (unchecked: internal, no notifications)
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={form.stickied} onChange={e => setForm({...form, stickied: e.target.checked})} />
+          Pinned at the top
+        </label>
+        {creating && (
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={form.notify} onChange={e => setForm({...form, notify: e.target.checked})} />
+            Notify subscribers
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
@@ -473,6 +548,7 @@ function IncidentsPage() {
           status: selectedTemplate?.default_status || 'investigating',
           component_id: form.component_id,
           component_status: form.component_status || undefined,
+          ...incidentOptions(form, !editId),
           translations: [
             { locale: 'en', field: 'name', value: preview.name_en },
             { locale: 'fr', field: 'name', value: preview.name_fr },
@@ -486,6 +562,7 @@ function IncidentsPage() {
           status: form.status,
           component_id: form.component_id,
           component_status: form.component_status || undefined,
+          ...incidentOptions(form, !editId),
           translations: buildTranslations(),
         };
       }
@@ -517,6 +594,10 @@ function IncidentsPage() {
       status: i.status,
       component_id: i.component_id,
       component_status: '',
+      visible: i.visible,
+      stickied: i.stickied,
+      occurred_at: i.occurred_at ? toLocalInput(i.occurred_at) : '',
+      notify: i.notifications,
       name_en: getTranslation('name', 'en'),
       name_fr: getTranslation('name', 'fr'),
       message_en: getTranslation('message', 'en'),
@@ -606,6 +687,7 @@ function IncidentsPage() {
               </div>
 
               <ComponentStatusSelect value={form.component_status} onChange={v => setForm({...form, component_status: v})} />
+              <IncidentOptionsFields form={form} setForm={setForm} creating={!editId} />
 
               {/* Variable inputs */}
               {selectedTemplate && selectedTemplate.parsed_variables && selectedTemplate.parsed_variables.length > 0 && (
@@ -710,6 +792,7 @@ function IncidentsPage() {
               </div>
 
               <ComponentStatusSelect value={form.component_status} onChange={v => setForm({...form, component_status: v})} />
+              <IncidentOptionsFields form={form} setForm={setForm} creating={!editId} />
 
               <div className="border-t pt-4">
                 <h4 className="font-medium mb-2">Translations</h4>
@@ -768,7 +851,11 @@ function IncidentsPage() {
           {incidents.map(i => (
             <Fragment key={i.id}>
               <tr>
-                <td className="border p-2">{i.name}</td>
+                <td className="border p-2">
+                  {i.name}
+                  {!i.visible && <span className="ml-2 text-xs px-2 py-1 rounded bg-gray-200 text-gray-600">internal</span>}
+                  {i.stickied && <span className="ml-2 text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800">pinned</span>}
+                </td>
                 <td className="border p-2">{i.status}</td>
                 <td className="border p-2">{components.find(c => c.id === i.component_id)?.name || '-'}</td>
                 <td className="border p-2">{new Date(i.created_at).toLocaleDateString()}</td>

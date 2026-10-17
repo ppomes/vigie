@@ -18,7 +18,8 @@
   },
   "incidents": {
     "title": "Incidents",
-    "noIncidents": "No incidents to display"
+    "noIncidents": "No incidents to display",
+    "pinned": "Pinned"
   },
   "incidentStatus": {
     "investigating": "Investigating",

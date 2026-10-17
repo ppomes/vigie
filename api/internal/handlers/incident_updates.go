@@ -170,7 +170,9 @@ func CreateIncidentUpdate(db *gorm.DB, notificationService *services.Notificatio
 			log.Printf("Incident update %d created, but reloading it failed: %v", update.ID, err)
 		}
 
-		if notificationService != nil {
+		// Internal incidents, and incidents created without notifications,
+		// stay silent.
+		if notificationService != nil && incident.Visible && incident.Notifications {
 			go func(incident models.Incident, update models.IncidentUpdate) {
 				if _, err := notificationService.QueueIncidentUpdateNotifications(&incident, &update); err != nil {
 					log.Printf("Failed to queue incident update notifications: %v", err)

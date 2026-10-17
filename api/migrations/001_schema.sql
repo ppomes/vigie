@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS components (
     description TEXT,
     display_order INT DEFAULT 0,
     group_id BIGINT UNSIGNED NULL,
+    link VARCHAR(1024) NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    meta TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
@@ -67,6 +70,11 @@ CREATE TABLE IF NOT EXISTS incidents (
     status VARCHAR(50) NOT NULL DEFAULT 'investigating',
     component_id BIGINT UNSIGNED,
     message TEXT,
+    visible BOOLEAN NOT NULL DEFAULT TRUE,
+    stickied BOOLEAN NOT NULL DEFAULT FALSE,
+    occurred_at TIMESTAMP NULL,
+    notifications BOOLEAN NOT NULL DEFAULT TRUE,
+    user_id BIGINT UNSIGNED NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
@@ -241,6 +249,25 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     INDEX idx_audit_resource (resource, resource_id),
     INDEX idx_audit_created_at (created_at),
     CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- TAGS
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS tags (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY idx_tags_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS component_tags (
+    component_id BIGINT UNSIGNED NOT NULL,
+    tag_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (component_id, tag_id),
+    CONSTRAINT fk_component_tags_component FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE,
+    CONSTRAINT fk_component_tags_tag FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================

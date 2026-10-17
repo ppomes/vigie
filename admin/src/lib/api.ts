@@ -90,7 +90,15 @@ export interface Component {
   status: string;
   order: number;
   group_id?: number | null;
+  link?: string;
+  // false hides the component from the public page
+  enabled: boolean;
+  meta?: Record<string, string>;
+  tags?: { id: number; name: string; slug: string }[];
 }
+
+// Body of a component create or update. tags are names.
+export type ComponentInput = Partial<Omit<Component, 'tags'>> & { tags?: string[] };
 
 export interface ComponentGroup {
   id: number;
@@ -123,7 +131,7 @@ export interface Translation {
 // Fields accepted when creating or updating an incident. component_status,
 // when set, changes the status of the affected component; when omitted, the
 // component status is left as it is.
-export type IncidentInput = Partial<Incident> & { component_status?: string };
+export type IncidentInput = Partial<Omit<Incident, 'updates'>> & { component_status?: string; notify?: boolean };
 
 export interface IncidentUpdate {
   id: number;
@@ -142,6 +150,11 @@ export interface Incident {
   translations?: Translation[];
   // Timeline, newest first
   updates?: IncidentUpdate[];
+  // false for internal incidents, kept off the public page and from subscribers
+  visible: boolean;
+  stickied: boolean;
+  occurred_at?: string | null;
+  notifications: boolean;
   created_at: string;
 }
 
@@ -241,9 +254,9 @@ export const api = {
     }),
 
   getComponents: () => fetchAPI<{ components: Component[] }>('/admin/components').then(r => r.components || []),
-  createComponent: (data: Partial<Component>) =>
+  createComponent: (data: ComponentInput) =>
     fetchAPI<Component>('/admin/components', { method: 'POST', body: JSON.stringify(data) }),
-  updateComponent: (id: number, data: Partial<Component>) =>
+  updateComponent: (id: number, data: ComponentInput) =>
     fetchAPI<Component>(`/admin/components/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteComponent: (id: number) =>
     fetchAPI<void>(`/admin/components/${id}`, { method: 'DELETE' }),
