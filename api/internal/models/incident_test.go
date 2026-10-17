@@ -68,7 +68,7 @@ func TestInvalidIncidentStatus(t *testing.T) {
 }
 
 func TestIncidentRequiredFields(t *testing.T) {
-	// Test required fields: name, status, component_id
+	// Test required fields: name and status
 	incident := Incident{
 		Name:        "Database Connection Timeout",
 		Status:      "investigating",
@@ -81,10 +81,6 @@ func TestIncidentRequiredFields(t *testing.T) {
 
 	if incident.Status == "" {
 		t.Error("Incident status is required but is empty")
-	}
-
-	if IDValue(incident.ComponentID) == 0 {
-		t.Error("Incident component_id is required but is 0")
 	}
 }
 
