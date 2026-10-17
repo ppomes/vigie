@@ -14,16 +14,13 @@ import (
 
 var groupSorts = map[string]string{"id": "id", "name": "name", "order": "order", "created_at": "created_at", "updated_at": "updated_at"}
 
-// groupQuery reads groups with their components. Anonymous readers only see
-// public groups, and their enabled components.
+// groupQuery reads groups with their enabled components: Cachet's
+// enabled_components never lists disabled ones, even with a key. Anonymous
+// readers only see public groups.
 func groupQuery(c *gin.Context, db *gorm.DB) *gorm.DB {
 	q := db.Model(&models.ComponentGroup{}).
 		Preload("Components", func(tx *gorm.DB) *gorm.DB {
-			q := models.ByDisplayOrder(tx).Preload("Translations").Preload("Tags")
-			if !authenticated(c) {
-				q = q.Where("enabled = ?", true)
-			}
-			return q
+			return models.ByDisplayOrder(tx).Where("enabled = ?", true).Preload("Translations").Preload("Tags")
 		})
 	if !authenticated(c) {
 		q = q.Where("visibility = ?", models.GroupVisibilityPublic)

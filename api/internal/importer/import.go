@@ -25,6 +25,9 @@ type Options struct {
 	// Locale is the locale Cachet's single-language text is stored under.
 	// Empty means Cachet's app_locale setting when it is en or fr, else en.
 	Locale string
+	// SourceTimezone is the zone Cachet wrote its dates in: its APP_TIMEZONE
+	// variable. Nil means UTC, Cachet's default.
+	SourceTimezone *time.Location
 }
 
 // errDryRun rolls the transaction back at the end of a dry run.
@@ -40,8 +43,12 @@ var seedComponents = map[uint]string{1: "API", 2: "Website", 3: "Database"}
 // admin account of its own.
 func Import(opts Options) (*Report, error) {
 	report := newReport(opts.DryRun)
-	err := opts.Target.Transaction(func(tx *gorm.DB) error {
-		im := &importer{src: opts.Source, dst: tx, report: report, locale: opts.Locale}
+	src, err := inSourceZone(opts.Source, opts.SourceTimezone)
+	if err != nil {
+		return nil, err
+	}
+	err = opts.Target.Transaction(func(tx *gorm.DB) error {
+		im := &importer{src: src, dst: tx, report: report, locale: opts.Locale, zone: opts.SourceTimezone}
 		if err := im.run(); err != nil {
 			return err
 		}
@@ -63,6 +70,7 @@ type importer struct {
 	src, dst *gorm.DB
 	report   *Report
 	locale   string
+	zone     *time.Location
 	settings map[string]string
 
 	components map[uint]bool // ids of imported components
@@ -150,6 +158,7 @@ func (im *importer) readSettings() error {
 			im.settings[s.Name] = *s.Value
 		}
 	}
+	im.checkZone()
 	if im.locale == "" {
 		im.locale = "en"
 		if l := strings.ToLower(im.settings["app_locale"]); strings.HasPrefix(l, "fr") {
@@ -686,8 +695,8 @@ func (im *importer) leftovers() error {
 	for _, t := range []struct {
 		table, reason string
 	}{
-		{"metrics", "metrics (Vigie has no metrics yet, see issue #15)"},
-		{"metric_points", "metric points (Vigie has no metrics yet, see issue #15)"},
+		{"metrics", "metrics (Vigie has no metrics)"},
+		{"metric_points", "metric points (Vigie has no metrics)"},
 		{"incident_templates", "incident templates (Cachet's use Twig; recreate them in Vigie)"},
 		{"invites", "pending user invitations"},
 	} {
@@ -703,4 +712,17 @@ func (im *importer) leftovers() error {
 		}
 	}
 	return nil
+}
+
+// checkZone reports the zone the dates were read in, and warns when Cachet
+// showed its times in another zone than the one they are read in: its
+// APP_TIMEZONE may not be UTC either.
+func (im *importer) checkZone() {
+	if im.zone != nil && im.zone != time.UTC {
+		im.report.note("Cachet's dates were read as %s times (--source-timezone). Set CACHET_API_TIMEZONE=%s, so that integrations see the same times as in Cachet.", im.zone, im.zone)
+		return
+	}
+	if tz := im.settings["app_timezone"]; tz != "" && tz != "UTC" {
+		im.report.note("Cachet's dates were read as UTC, but Cachet showed them in %s. If Cachet's .env sets APP_TIMEZONE to anything but UTC, run the import again with --source-timezone set to that value.", tz)
+	}
 }

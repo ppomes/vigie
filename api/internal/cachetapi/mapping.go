@@ -2,8 +2,10 @@ package cachetapi
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -88,11 +90,13 @@ var (
 )
 
 // cachetTime formats times as Cachet does ("2006-01-02 15:04:05"), in UTC.
+// cachetTime writes a date as Cachet does: wall-clock time, without a zone,
+// in the zone Cachet stored its dates in.
 func cachetTime(t time.Time) string {
 	if t.IsZero() {
 		return ""
 	}
-	return t.UTC().Format("2006-01-02 15:04:05")
+	return t.In(apiZone()).Format("2006-01-02 15:04:05")
 }
 
 func cachetTimePtr(t *time.Time) any {
@@ -102,7 +106,8 @@ func cachetTimePtr(t *time.Time) any {
 	return cachetTime(*t)
 }
 
-// parseCachetTime reads the date formats Cachet clients send.
+// parseCachetTime reads the date formats Cachet clients send. Dates without
+// a zone are wall-clock times in the API's zone, as in Cachet.
 func parseCachetTime(s string) (time.Time, error) {
 	s = strings.TrimSpace(s)
 	for _, layout := range []string{
@@ -113,12 +118,28 @@ func parseCachetTime(s string) (time.Time, error) {
 		"02/01/2006 15:04",
 		"2006-01-02",
 	} {
-		if t, err := time.ParseInLocation(layout, s, time.UTC); err == nil {
+		if t, err := time.ParseInLocation(layout, s, apiZone()); err == nil {
 			return t, nil
 		}
 	}
 	return time.Time{}, fmt.Errorf("invalid date %q", s)
 }
+
+// apiZone is the zone of the dates the API reads and writes without a zone.
+// Set CACHET_API_TIMEZONE to Cachet's APP_TIMEZONE, so that integrations
+// keep seeing the times they saw in Cachet. The default is UTC, Cachet's.
+var apiZone = sync.OnceValue(func() *time.Location {
+	name := strings.TrimSpace(os.Getenv("CACHET_API_TIMEZONE"))
+	if name == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		log.Printf("CACHET_API_TIMEZONE: unknown zone %q, using UTC", name)
+		return time.UTC
+	}
+	return loc
+})
 
 // contentLocale is the locale Cachet's single-language text (descriptions,
 // messages) is stored under. CACHET_API_LOCALE overrides the default, "en".

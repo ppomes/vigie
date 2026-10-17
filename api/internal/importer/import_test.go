@@ -252,8 +252,8 @@ func TestImportCachet24(t *testing.T) {
 	if b["title_en"] != "Acme Status" {
 		t.Fatalf("branding: %q", branding.Value)
 	}
-	if report.LeftOut["metrics (Vigie has no metrics yet, see issue #15)"] != 1 ||
-		report.LeftOut["metric points (Vigie has no metrics yet, see issue #15)"] != 2 {
+	if report.LeftOut["metrics (Vigie has no metrics)"] != 1 ||
+		report.LeftOut["metric points (Vigie has no metrics)"] != 2 {
 		t.Fatalf("left out: %v", report.LeftOut)
 	}
 	for _, want := range []string{"PUBLIC_URL", "status.acme.test", "two-factor", "phone-only", "level 2", "deleted in Cachet"} {
@@ -317,5 +317,59 @@ func TestLocaleOverride(t *testing.T) {
 	sort.Strings(locales)
 	if fmt.Sprint(locales) != "[en]" {
 		t.Fatalf("locales %v, want [en]", locales)
+	}
+}
+
+func TestSourceTimezone(t *testing.T) {
+	paris, err := time.LoadLocation("Europe/Paris")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, dst := cachetSource(t), freshVigie(t)
+	if err := src.Exec("INSERT INTO settings (name, value) VALUES ('app_timezone', 'Europe/Paris')").Error; err != nil {
+		t.Fatal(err)
+	}
+	report, err := Import(Options{Source: src, Target: dst, SourceTimezone: paris})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Cachet wrote 09:00 Paris time, which is 08:00 UTC in March.
+	var i models.Incident
+	if err := dst.First(&i, 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if want := time.Date(2024, 3, 1, 8, 0, 0, 0, time.UTC); i.OccurredAt == nil || !i.OccurredAt.Equal(want) {
+		t.Fatalf("occurred_at %v, want %v", i.OccurredAt, want)
+	}
+	var m models.Maintenance
+	if err := dst.First(&m, 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if want := time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC); !m.StartAt.Equal(want) {
+		t.Fatalf("start_at %v, want %v (02:00 in Paris, summer time)", m.StartAt, want)
+	}
+	if !strings.Contains(strings.Join(report.Notes, "\n"), "read as Europe/Paris times") {
+		t.Fatalf("notes %q do not mention the zone", report.Notes)
+	}
+}
+
+func TestWarnsWhenCachetShowedAnotherZone(t *testing.T) {
+	src, dst := cachetSource(t), freshVigie(t)
+	if err := src.Exec("INSERT INTO settings (name, value) VALUES ('app_timezone', 'Europe/Paris')").Error; err != nil {
+		t.Fatal(err)
+	}
+	report, err := Import(Options{Source: src, Target: dst})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var i models.Incident
+	if err := dst.First(&i, 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if want := time.Date(2024, 3, 1, 9, 0, 0, 0, time.UTC); !i.OccurredAt.Equal(want) {
+		t.Fatalf("occurred_at %v, want %v: UTC by default", i.OccurredAt, want)
+	}
+	if !strings.Contains(strings.Join(report.Notes, "\n"), "--source-timezone") {
+		t.Fatalf("notes %q do not suggest --source-timezone", report.Notes)
 	}
 }

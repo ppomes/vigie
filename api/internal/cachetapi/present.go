@@ -45,7 +45,8 @@ func presentComponent(c models.Component) gin.H {
 	if len(c.Meta) > 0 {
 		meta = c.Meta
 	}
-	var groupID any
+	// Cachet answers 0, not null, for a component outside any group.
+	groupID := uint(0)
 	if c.GroupID != nil {
 		groupID = *c.GroupID
 	}

@@ -28,6 +28,8 @@ Set these variables for the API (in `.env` for Docker Compose, under
 | `PUBLIC_URL` | Address of the public status page, for example the Cachet one: `https://status.example.com` |
 | `API_URL` | Address readers use to reach the API, in email links |
 | `ADMIN_URL` | Address of the admin, where old `/dashboard` links go |
+| `CACHET_API_TIMEZONE` | Cachet's `APP_TIMEZONE`, so that integrations see the same times as before. `UTC` by default |
+| `CACHET_API_LOCALE` | The language of Cachet's text, as `--locale` below. `en` by default |
 | `EMAIL_*` | Your email provider, as in [the README](../README.md) |
 
 ## 3. Dry run
@@ -51,6 +53,11 @@ Pay attention to:
   two-factor secrets, metrics and incident templates.
 - **Text language**: Cachet's text is stored in one language. Use `--locale`
   if `app_locale` is not the language of your incidents.
+- **Timezone**: Cachet stores its dates in the zone of `APP_TIMEZONE`, in its
+  `.env` file, not in its database. If it is not `UTC`, add
+  `--source-timezone` with that value, for example
+  `--source-timezone Europe/Paris`, or every date is shifted. The report
+  warns when Cachet showed its times in another zone.
 
 ## 4. Import
 

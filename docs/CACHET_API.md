@@ -25,7 +25,8 @@ working. A key acts with the role of its user: writes need an admin.
 
 Reads need no key, as in Cachet. Anonymous readers see what the public page
 shows: enabled components, public groups, visible incidents. With a key, they
-see everything. A wrong key is refused rather than ignored.
+see everything, except in a group's `enabled_components`, which only lists
+enabled components, as in Cachet. A wrong key is refused rather than ignored.
 
 ## Endpoints
 
@@ -70,6 +71,12 @@ Cachet 2.4.1.
   through this API are stored in English, or in the locale set by
   `CACHET_API_LOCALE` (`en` or `fr`). Other translations, added in the admin,
   are kept.
+- **Dates have no zone, as in Cachet.** They are read and written in the
+  zone set by `CACHET_API_TIMEZONE`, UTC by default. Set it to Cachet's
+  `APP_TIMEZONE` so that integrations see the same times as before. A date
+  sent with an RFC 3339 offset is read at that instant, and is written back
+  in the API's zone, without an offset: `02:00+03:00` reads back as
+  `23:00:00` the day before when the zone is UTC.
 - **Groups created through this API** are visible to logged-in users only
   unless `visible=1` is sent, as in Cachet.
 - Metrics, subscribers, subscriptions and incident templates have no endpoint
