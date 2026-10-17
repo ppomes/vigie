@@ -127,6 +127,11 @@ func main() {
 		// Self-service endpoints (any authenticated user)
 		admin.GET("/me", handlers.GetCurrentUserProfile(db))
 		admin.PUT("/me/password", middleware.RequireSession(), handlers.ChangeOwnPassword(db, auditService))
+		twoFactor := admin.Group("/me/two-factor", middleware.RequireSession())
+		twoFactor.POST("/setup", handlers.SetupTwoFactor(db, auditService))
+		twoFactor.POST("/enable", handlers.EnableTwoFactor(db, auditService))
+		twoFactor.POST("/disable", handlers.DisableTwoFactor(db, auditService))
+		twoFactor.POST("/recovery-codes", handlers.RegenerateRecoveryCodes(db, auditService))
 
 		// Read-only routes (viewers and admins can access)
 		admin.GET("/components", handlers.ListComponents(db))
@@ -207,6 +212,7 @@ func main() {
 			adminOnly.PUT("/users/:id", middleware.RequireSession(), handlers.UpdateUser(db, auditService))
 			adminOnly.DELETE("/users/:id", middleware.RequireSession(), handlers.DeleteUser(db, auditService))
 			adminOnly.PUT("/users/:id/password", middleware.RequireSession(), handlers.ResetUserPassword(db, auditService))
+			adminOnly.DELETE("/users/:id/two-factor", middleware.RequireSession(), handlers.ResetUserTwoFactor(db, auditService))
 
 			// API keys (admin only, and only from an interactive session:
 			// an API key cannot create or revoke keys)

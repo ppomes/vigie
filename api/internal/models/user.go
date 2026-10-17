@@ -19,24 +19,38 @@ const (
 // User represents an admin user for authentication
 // Supports bcrypt password hashing for secure authentication
 type User struct {
-	ID                  uint           `gorm:"primaryKey" json:"id"`
-	Username            string         `gorm:"size:255;not null;unique;index" json:"username"`
-	Email               string         `gorm:"size:255;not null;unique;index" json:"email"`
-	Password            string         `gorm:"size:255;not null" json:"-"` // Hidden from JSON for security
-	Role                string         `gorm:"size:50;not null;default:'viewer'" json:"role"`
-	Active              bool           `gorm:"default:1" json:"active"`
-	LastLogin           *time.Time     `json:"last_login,omitempty"`
-	PasswordResetToken  *string        `gorm:"size:255;index" json:"-"`
-	PasswordResetExpiry *time.Time     `json:"-"`
-	ForcePasswordChange bool           `gorm:"default:0" json:"force_password_change"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                  uint       `gorm:"primaryKey" json:"id"`
+	Username            string     `gorm:"size:255;not null;unique;index" json:"username"`
+	Email               string     `gorm:"size:255;not null;unique;index" json:"email"`
+	Password            string     `gorm:"size:255;not null" json:"-"` // Hidden from JSON for security
+	Role                string     `gorm:"size:50;not null;default:'viewer'" json:"role"`
+	Active              bool       `gorm:"default:1" json:"active"`
+	LastLogin           *time.Time `json:"last_login,omitempty"`
+	PasswordResetToken  *string    `gorm:"size:255;index" json:"-"`
+	PasswordResetExpiry *time.Time `json:"-"`
+	ForcePasswordChange bool       `gorm:"default:0" json:"force_password_change"`
+	// TwoFactorSecret is the base32 TOTP secret once two-factor login is on.
+	// It cannot be hashed: the server needs it to compute the codes.
+	TwoFactorSecret *string `gorm:"size:64" json:"-"`
+	// TwoFactorPendingSecret is the secret shown during setup, until the
+	// user confirms a first code.
+	TwoFactorPendingSecret *string `gorm:"size:64" json:"-"`
+	// TwoFactorLastStep is the time step of the last code accepted, so a
+	// code cannot be used twice.
+	TwoFactorLastStep int64          `gorm:"not null;default:0" json:"-"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // IsAdmin returns true if the user has admin role
 func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
+}
+
+// TwoFactorEnabled reports whether login asks for a code.
+func (u *User) TwoFactorEnabled() bool {
+	return u.TwoFactorSecret != nil && *u.TwoFactorSecret != ""
 }
 
 // IsViewer returns true if the user has viewer role

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"api/internal/models"
@@ -19,6 +20,10 @@ import (
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	// Code is the two-factor code, or a recovery code, for users who have
+	// two-factor login on. Without it, such a login answers 401 with
+	// two_factor_required, and the client asks for the code.
+	Code string `json:"code"`
 }
 
 // LoginResponse represents the response returned after successful authentication
@@ -27,6 +32,8 @@ type LoginResponse struct {
 	ExpiresAt           time.Time `json:"expires_at"`
 	User                UserInfo  `json:"user"`
 	ForcePasswordChange bool      `json:"force_password_change"`
+	// RecoveryCodesLeft is set when the login used a recovery code.
+	RecoveryCodesLeft *int `json:"recovery_codes_left,omitempty"`
 }
 
 // UserInfo represents basic user information returned after login
@@ -79,6 +86,37 @@ func Login(db *gorm.DB, auditService *services.AuditService) gin.HandlerFunc {
 			return
 		}
 
+		// Second factor, for users who turned it on
+		var codesLeft *int
+		if user.TwoFactorEnabled() {
+			if strings.TrimSpace(req.Code) == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Two-factor code required", "two_factor_required": true})
+				return
+			}
+			ok, recovery, err := checkSecondFactor(db, &user, req.Code)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+				return
+			}
+			if !ok {
+				auditService.LogLogin(c, req.Username, &user.ID, false)
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid two-factor code", "two_factor_required": true})
+				return
+			}
+			if recovery {
+				left, err := recoveryCodesLeft(db, user.ID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+					return
+				}
+				codesLeft = &left
+				auditService.Log(c, models.ActionUpdate, models.ResourceUser, &user.ID, map[string]interface{}{
+					"action":              "recovery_code_used",
+					"recovery_codes_left": left,
+				}, true)
+			}
+		}
+
 		// Generate JWT token
 		token, expiresAt, err := generateToken(user.ID)
 		if err != nil {
@@ -86,10 +124,9 @@ func Login(db *gorm.DB, auditService *services.AuditService) gin.HandlerFunc {
 			return
 		}
 
-		// Update last_login
-		now := time.Now()
-		user.LastLogin = &now
-		db.Save(&user)
+		// Update last_login. Only this column: a full save would write back
+		// the two-factor step read before the code was checked.
+		db.Model(&user).Update("last_login", time.Now())
 
 		// Log successful login
 		auditService.LogLogin(c, req.Username, &user.ID, true)
@@ -105,6 +142,7 @@ func Login(db *gorm.DB, auditService *services.AuditService) gin.HandlerFunc {
 				Role:     user.Role,
 			},
 			ForcePasswordChange: user.ForcePasswordChange,
+			RecoveryCodesLeft:   codesLeft,
 		})
 	}
 }

@@ -101,8 +101,10 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 
 // Global rate limiters for different endpoints
 var (
-	// LoginLimiter: 5 attempts per 15 minutes per IP
-	LoginLimiter = NewRateLimiter(5, 15*time.Minute)
+	// LoginLimiter: 10 requests per 15 minutes per IP. A two-factor login
+	// takes two requests (password, then code), so this is still about five
+	// attempts.
+	LoginLimiter = NewRateLimiter(10, 15*time.Minute)
 
 	// PasswordResetLimiter: 3 requests per hour per IP
 	PasswordResetLimiter = NewRateLimiter(3, time.Hour)

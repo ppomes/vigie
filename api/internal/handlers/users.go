@@ -46,6 +46,10 @@ type UserResponse struct {
 	Active    bool   `json:"active"`
 	LastLogin string `json:"last_login,omitempty"`
 	CreatedAt string `json:"created_at"`
+	// TwoFactorEnabled reports whether login asks for a code.
+	TwoFactorEnabled bool `json:"two_factor_enabled"`
+	// RecoveryCodesLeft is only set on the current user's profile.
+	RecoveryCodesLeft *int `json:"recovery_codes_left,omitempty"`
 }
 
 // toUserResponse converts a User model to UserResponse
@@ -57,6 +61,8 @@ func toUserResponse(user *models.User) UserResponse {
 		Role:      user.Role,
 		Active:    user.Active,
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+
+		TwoFactorEnabled: user.TwoFactorEnabled(),
 	}
 	if user.LastLogin != nil {
 		resp.LastLogin = user.LastLogin.Format("2006-01-02T15:04:05Z")
@@ -335,7 +341,16 @@ func GetCurrentUserProfile(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"user": toUserResponse(user)})
+		resp := toUserResponse(user)
+		if user.TwoFactorEnabled() {
+			left, err := recoveryCodesLeft(db, user.ID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch recovery codes"})
+				return
+			}
+			resp.RecoveryCodesLeft = &left
+		}
+		c.JSON(http.StatusOK, gin.H{"user": resp})
 	}
 }
 

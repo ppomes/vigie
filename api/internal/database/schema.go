@@ -24,6 +24,7 @@ func Models() []any {
 		&models.MaintenanceTemplate{},
 		&models.AuditLog{},
 		&models.APIKey{},
+		&models.RecoveryCode{},
 		&models.IncidentUpdate{},
 		&models.ComponentGroup{},
 		&models.Tag{},

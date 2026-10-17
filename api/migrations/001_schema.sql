@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS users (
     password_reset_token VARCHAR(255) NULL,
     password_reset_expiry TIMESTAMP NULL,
     force_password_change BOOLEAN NOT NULL DEFAULT FALSE,
+    two_factor_secret VARCHAR(64) NULL,
+    two_factor_pending_secret VARCHAR(64) NULL,
+    two_factor_last_step BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
@@ -328,6 +331,16 @@ CREATE TABLE IF NOT EXISTS api_keys (
     INDEX idx_api_keys_user_id (user_id),
     INDEX idx_api_keys_revoked_at (revoked_at),
     CONSTRAINT fk_api_keys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS recovery_codes (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    code_hash VARCHAR(64) NOT NULL,
+    used_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_recovery_codes_user_id (user_id),
+    CONSTRAINT fk_recovery_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
