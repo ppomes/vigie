@@ -67,10 +67,16 @@ func cachetSource(t *testing.T) *gorm.DB {
 func freshVigie(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := testutil.NewDB(t)
-	db.Create(&models.User{Username: "admin", Email: "admin@example.com", Password: "x", Role: models.RoleAdmin, Active: true})
+	if err := db.Create(&models.User{Username: "admin", Email: "admin@example.com", Password: "x", Role: models.RoleAdmin, Active: true}).Error; err != nil {
+		t.Fatal(err)
+	}
 	for id, name := range seedComponents {
-		db.Create(&models.Component{ID: id, Name: name, Status: "operational"})
-		db.Create(&models.Translation{EntityID: id, EntityType: "component", Locale: "fr", Field: "name", Value: name})
+		if err := db.Create(&models.Component{ID: id, Name: name, Status: "operational"}).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Create(&models.Translation{EntityID: id, EntityType: "component", Locale: "fr", Field: "name", Value: name}).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
 	return db
 }
@@ -240,7 +246,7 @@ func TestImportCachet24(t *testing.T) {
 
 	// Settings and report
 	var branding models.Settings
-	dst.Where("`key` = ?", "branding").First(&branding)
+	dst.Where(&models.Settings{Key: "branding"}).First(&branding)
 	var b map[string]string
 	json.Unmarshal([]byte(branding.Value), &b)
 	if b["title_en"] != "Acme Status" {

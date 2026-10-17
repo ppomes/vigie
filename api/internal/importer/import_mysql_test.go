@@ -38,7 +38,9 @@ func TestImportFromMySQL(t *testing.T) {
 	if err := database.Migrate(dst); err != nil {
 		t.Fatal(err)
 	}
-	dst.Create(&models.User{Username: "admin", Email: "admin@example.com", Password: "x", Role: models.RoleAdmin, Active: true})
+	if err := dst.Create(&models.User{Username: "admin", Email: "admin@example.com", Password: "x", Role: models.RoleAdmin, Active: true}).Error; err != nil {
+		t.Fatal(err)
+	}
 
 	report, err := Import(Options{Source: src, Target: dst})
 	if err != nil {

@@ -658,7 +658,7 @@ func (im *importer) applySettings() error {
 			return err
 		}
 		var setting models.Settings
-		err = im.dst.Where("`key` = ?", "branding").First(&setting).Error
+		err = im.dst.Where(&models.Settings{Key: "branding"}).First(&setting).Error
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			if err := im.dst.Create(&models.Settings{Key: "branding", Value: string(branding)}).Error; err != nil {
