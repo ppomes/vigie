@@ -407,8 +407,8 @@ func (im *importer) importUsers() error {
 		}
 	}
 	if n := im.report.Imported["two-factor secrets"]; n > 0 {
-		im.report.note("%d users keep their two-factor login from Cachet, with the same entry in their authenticator app. "+
-			"They have no recovery codes yet: ask them to make some from their profile in the admin.", n)
+		im.report.note("Two-factor login carried over for %d of the users, with the same entry in their authenticator app. "+
+			"They have no recovery codes yet: ask them to make some from \"Two-Factor Login\" in the admin.", n)
 	}
 	return nil
 }
