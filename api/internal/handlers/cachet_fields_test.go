@@ -47,6 +47,7 @@ func TestComponentLinkMetaTagsEnabled(t *testing.T) {
 
 	for name, body := range map[string]map[string]any{
 		"javascript link": {"name": "x", "status": "operational", "link": "javascript:alert(1)"},
+		"link, no host":   {"name": "x", "status": "operational", "link": "https:// "},
 		"empty tag":       {"name": "x", "status": "operational", "tags": []string{"--"}},
 	} {
 		if code := status(t, r, http.MethodPost, "/components", body); code != http.StatusBadRequest {
@@ -117,6 +118,22 @@ func TestIncidentVisibilityStickinessAndOccurredAt(t *testing.T) {
 	get(t, r, "/public/status", &st)
 	if st.Incidents != 1 {
 		t.Fatalf("active public incidents %d, want 1", st.Incidents)
+	}
+
+	// Leaving occurred_at out keeps it; null clears it.
+	var old models.Incident
+	db.Where("name = ?", "Old").First(&old)
+	path := fmt.Sprintf("/incidents/%d", old.ID)
+	call(t, r, http.MethodPut, path, map[string]any{"name": "Old"})
+	db.First(&old, old.ID)
+	if old.OccurredAt == nil || old.OccurredAt.Day() != 1 {
+		t.Fatalf("occurred_at %v after an update without it, want Jan 1", old.OccurredAt)
+	}
+	call(t, r, http.MethodPut, path, map[string]any{"occurred_at": nil})
+	var cleared models.Incident // fresh: GORM leaves a set pointer alone on NULL
+	db.First(&cleared, old.ID)
+	if cleared.OccurredAt != nil {
+		t.Fatalf("occurred_at %v after null, want NULL", cleared.OccurredAt)
 	}
 }
 

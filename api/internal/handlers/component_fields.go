@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"net/url"
 	"strings"
 
 	"api/internal/models"
@@ -23,10 +24,12 @@ type componentExtras struct {
 
 // validate checks the extras and returns an error message, or "".
 func (e componentExtras) validate() string {
-	if e.Link != nil && *e.Link != "" {
-		l := strings.ToLower(*e.Link)
-		if !strings.HasPrefix(l, "http://") && !strings.HasPrefix(l, "https://") {
-			return "Link must be an http or https URL"
+	if e.Link != nil {
+		if l := strings.TrimSpace(*e.Link); l != "" {
+			u, err := url.Parse(l)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+				return "Link must be an http or https URL"
+			}
 		}
 	}
 	if e.Tags != nil {

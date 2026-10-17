@@ -153,7 +153,7 @@ export interface Incident {
   // false for internal incidents, kept off the public page and from subscribers
   visible: boolean;
   stickied: boolean;
-  occurred_at?: string;
+  occurred_at?: string | null;
   notifications: boolean;
   created_at: string;
 }

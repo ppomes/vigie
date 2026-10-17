@@ -1,10 +1,12 @@
 package handlers
 
 import (
-	"time"
+	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"api/internal/models"
 	"api/internal/services"
@@ -59,8 +61,30 @@ type incidentExtras struct {
 	Visible *bool `json:"visible"`
 	// Stickied pins the incident at the top of the public page.
 	Stickied *bool `json:"stickied"`
-	// OccurredAt is when the incident started. It defaults to now.
-	OccurredAt *time.Time `json:"occurred_at"`
+	// OccurredAt is when the incident started. It defaults to now, and
+	// null clears it, so the creation time is shown instead.
+	OccurredAt optionalTime `json:"occurred_at"`
+}
+
+// optionalTime tells an omitted JSON field from an explicit null, which a
+// *time.Time cannot: both decode to nil.
+type optionalTime struct {
+	Value *time.Time
+	Set   bool
+}
+
+func (t *optionalTime) UnmarshalJSON(data []byte) error {
+	t.Set = true
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		t.Value = nil
+		return nil
+	}
+	var v time.Time
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	t.Value = &v
+	return nil
 }
 
 // apply writes the extras on a saved incident, through a map so false is
@@ -73,8 +97,12 @@ func (e incidentExtras) apply(tx *gorm.DB, incident *models.Incident) error {
 	if e.Stickied != nil {
 		updates["stickied"] = *e.Stickied
 	}
-	if e.OccurredAt != nil {
-		updates["occurred_at"] = *e.OccurredAt
+	if e.OccurredAt.Set {
+		if e.OccurredAt.Value == nil {
+			updates["occurred_at"] = nil
+		} else {
+			updates["occurred_at"] = *e.OccurredAt.Value
+		}
 	}
 	if len(updates) == 0 {
 		return nil

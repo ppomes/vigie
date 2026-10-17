@@ -440,7 +440,7 @@ function incidentOptions(form: IncidentForm, creating: boolean) {
   return {
     visible: form.visible,
     stickied: form.stickied,
-    occurred_at: form.occurred_at ? new Date(form.occurred_at).toISOString() : undefined,
+    occurred_at: form.occurred_at ? new Date(form.occurred_at).toISOString() : null,
     notify: creating ? form.notify : undefined,
   };
 }
