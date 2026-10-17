@@ -324,6 +324,14 @@ const defaultIncidentForm: IncidentForm = {
 
 // Checkboxes for the components an incident or maintenance also affects,
 // besides its main component.
+// mainComponentChange is the form change for a new main component. "No
+// component (general)" also drops the extra components, which the API would
+// otherwise promote to the main one.
+function mainComponentChange(value: string): { component_id: number; extra_component_ids?: number[] } {
+  const id = parseInt(value);
+  return id === 0 ? { component_id: 0, extra_component_ids: [] } : { component_id: id };
+}
+
 function ExtraComponentsPicker({ components, mainId, value, onChange }: {
   components: Component[];
   mainId: number;
@@ -467,8 +475,9 @@ function toLocalInput(iso: string): string {
 // The affected components of an incident form: the main component first,
 // with the chosen status, then the others, whose status is left unchanged.
 function affectedComponents(form: IncidentForm) {
+  const main = form.component_id ? [{ component_id: form.component_id, status: form.component_status || undefined }] : [];
   return [
-    { component_id: form.component_id, status: form.component_status || undefined },
+    ...main,
     ...form.extra_component_ids.filter(id => id !== form.component_id).map(id => ({ component_id: id })),
   ];
 }
@@ -632,7 +641,7 @@ function IncidentsPage() {
     setForm({
       name: i.name,
       status: i.status,
-      component_id: i.component_id,
+      component_id: i.component_id ?? 0,
       component_status: '',
       extra_component_ids: (i.components || []).map(ac => ac.component_id).filter(id => id !== i.component_id),
       visible: i.visible,
@@ -720,9 +729,10 @@ function IncidentsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Component</label>
                 <select
                   value={form.component_id}
-                  onChange={e => setForm({...form, component_id: parseInt(e.target.value)})}
+                  onChange={e => setForm({...form, ...mainComponentChange(e.target.value)})}
                   className="w-full border rounded px-3 py-2"
                 >
+                  <option value={0}>No component (general)</option>
                   {components.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
@@ -829,7 +839,8 @@ function IncidentsPage() {
                   <option value="monitoring">Monitoring</option>
                   <option value="resolved">Resolved</option>
                 </select>
-                <select value={form.component_id} onChange={e => setForm({...form, component_id: parseInt(e.target.value)})} className="border rounded px-3 py-2">
+                <select value={form.component_id} onChange={e => setForm({...form, ...mainComponentChange(e.target.value)})} className="border rounded px-3 py-2">
+                  <option value={0}>No component (general)</option>
                   {components.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
@@ -2084,7 +2095,7 @@ function MaintenancesPage() {
     setForm({
       name: m.name,
       status: m.status,
-      component_id: m.component_id,
+      component_id: m.component_id ?? 0,
       extra_component_ids: (m.components || []).map(mc => mc.component_id).filter(id => id !== m.component_id),
       start_at: m.start_at.slice(0, 16),
       end_at: m.end_at.slice(0, 16),
@@ -2252,9 +2263,10 @@ function MaintenancesPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Component</label>
               <select
                 value={form.component_id}
-                onChange={e => setForm({ ...form, component_id: parseInt(e.target.value) })}
+                onChange={e => setForm({ ...form, ...mainComponentChange(e.target.value) })}
                 className="w-full border rounded px-3 py-2"
               >
+                <option value={0}>No component (general)</option>
                 {components.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <div className="mt-2">
@@ -2326,7 +2338,7 @@ function MaintenancesPage() {
           {maintenances.map(m => (
             <tr key={m.id}>
               <td className="border p-2">{m.name}</td>
-              <td className="border p-2">{m.component?.name || 'Unknown'}</td>
+              <td className="border p-2">{m.component_id == null ? 'General' : m.component?.name || 'Unknown'}</td>
               <td className="border p-2">
                 <span className={getStatusBadge(m.status)}>{m.status.replace('_', ' ')}</span>
               </td>

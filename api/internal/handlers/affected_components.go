@@ -12,8 +12,9 @@ import (
 
 // componentSet merges a main component and extra ones into a deduplicated
 // list, main first, and checks that each exists. A zero main component means
-// "the first extra one". It writes the error response and returns false on
-// failure.
+// "the first extra one". The list may be empty: general incidents and
+// maintenances affect no component. It writes the error response and
+// returns false on failure.
 func componentSet(c *gin.Context, db *gorm.DB, main uint, extra []uint) ([]uint, bool) {
 	ids := []uint{}
 	seen := map[uint]bool{}
@@ -25,8 +26,7 @@ func componentSet(c *gin.Context, db *gorm.DB, main uint, extra []uint) ([]uint,
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one component is required"})
-		return nil, false
+		return ids, true
 	}
 	var count int64
 	if err := db.Model(&models.Component{}).Where("id IN ?", ids).Count(&count).Error; err != nil {
@@ -148,7 +148,7 @@ func incidentComponents(c *gin.Context, db *gorm.DB, main uint, list []AffectedC
 	if !ok {
 		return nil, false
 	}
-	if componentStatus != "" && statuses[ids[0]] == "" {
+	if componentStatus != "" && len(ids) > 0 && statuses[ids[0]] == "" {
 		statuses[ids[0]] = componentStatus
 	}
 	out := make([]AffectedComponentRequest, len(ids))
@@ -156,6 +156,22 @@ func incidentComponents(c *gin.Context, db *gorm.DB, main uint, list []AffectedC
 		out[i] = AffectedComponentRequest{ComponentID: id, Status: statuses[id]}
 	}
 	return out, true
+}
+
+// mainOf returns the main component of a list, or nil when it is empty.
+func mainOf(list []AffectedComponentRequest) *uint {
+	if len(list) == 0 {
+		return nil
+	}
+	return models.OptionalID(list[0].ComponentID)
+}
+
+// firstOf returns the first id of a list, or nil when it is empty.
+func firstOf(ids []uint) *uint {
+	if len(ids) == 0 {
+		return nil
+	}
+	return models.OptionalID(ids[0])
 }
 
 func containsComponent(list []AffectedComponentRequest, id uint) bool {

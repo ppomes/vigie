@@ -396,7 +396,7 @@ func CreateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		incident := models.Incident{
 			Name:        req.Name,
 			Status:      req.Status,
-			ComponentID: affected[0].ComponentID,
+			ComponentID: mainOf(affected),
 			OccurredAt:  &now,
 		}
 		if user, _ := services.GetCurrentUser(c); user != nil {
@@ -523,7 +523,7 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 		var affected []AffectedComponentRequest
 		switch {
 		case req.Components != nil || req.ComponentID != nil:
-			main := incident.ComponentID
+			main := models.IDValue(incident.ComponentID)
 			if req.ComponentID != nil {
 				main = *req.ComponentID
 			}
@@ -540,15 +540,15 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 				tx.Rollback()
 				return
 			}
-			incident.ComponentID = affected[0].ComponentID
-		case req.ComponentStatus != "":
+			incident.ComponentID = mainOf(affected)
+		case req.ComponentStatus != "" && incident.ComponentID != nil:
 			current, err := currentIncidentComponents(tx, incident.ID)
 			if err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch components"})
 				return
 			}
-			affected = withMainStatus(current, incident.ComponentID, req.ComponentStatus)
+			affected = withMainStatus(current, *incident.ComponentID, req.ComponentStatus)
 		}
 
 		if err := tx.Save(&incident).Error; err != nil {

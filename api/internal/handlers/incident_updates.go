@@ -205,8 +205,8 @@ func applyUpdateStatuses(tx *gorm.DB, incident models.Incident, req CreateIncide
 		affected[ac.ComponentID] = true
 	}
 	changes := map[uint]string{}
-	if req.ComponentStatus != "" {
-		changes[incident.ComponentID] = req.ComponentStatus
+	if req.ComponentStatus != "" && incident.ComponentID != nil {
+		changes[*incident.ComponentID] = req.ComponentStatus
 	}
 	for _, ac := range req.Components {
 		if !affected[ac.ComponentID] {

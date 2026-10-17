@@ -30,7 +30,7 @@ export interface Incident {
   id: number;
   name: string;
   status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
-  component_id: number;
+  component_id: number | null;
   component?: Component;
   translations?: Translation[];
   // Timeline, newest first
@@ -60,7 +60,7 @@ export interface Maintenance {
   name: string;
   message: string;
   status: 'scheduled' | 'in_progress' | 'completed';
-  component_id: number;
+  component_id: number | null;
   component: string;
   // Names of every covered component, main one first
   components?: string[];

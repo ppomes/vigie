@@ -82,7 +82,7 @@ func (n *NotificationService) QueueIncidentUpdateNotifications(incident *models.
 // is set, its status and message replace the incident's.
 func (n *NotificationService) queueIncident(incident *models.Incident, update *models.IncidentUpdate, eventType string) (int, error) {
 	// Confirmed subscribers who follow one of the affected components
-	componentIDs, err := n.affectedComponentIDs(&models.IncidentComponent{}, "incident_id", incident.ID, incident.ComponentID)
+	componentIDs, err := n.affectedComponentIDs(&models.IncidentComponent{}, "incident_id", incident.ID, models.IDValue(incident.ComponentID))
 	if err != nil {
 		return 0, err
 	}
@@ -410,7 +410,7 @@ func (n *NotificationService) NotifyMaintenanceUpdated(maintenance *models.Maint
 // QueueMaintenanceNotifications queues notifications for all confirmed subscribers about a maintenance
 func (n *NotificationService) QueueMaintenanceNotifications(maintenance *models.Maintenance, eventType string) (int, error) {
 	// Confirmed subscribers who follow one of the covered components
-	componentIDs, err := n.affectedComponentIDs(&models.MaintenanceComponent{}, "maintenance_id", maintenance.ID, maintenance.ComponentID)
+	componentIDs, err := n.affectedComponentIDs(&models.MaintenanceComponent{}, "maintenance_id", maintenance.ID, models.IDValue(maintenance.ComponentID))
 	if err != nil {
 		return 0, err
 	}

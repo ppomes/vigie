@@ -11,8 +11,10 @@ type Maintenance struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
 	Name         string         `gorm:"size:255;not null" json:"name"`
 	Status       string         `gorm:"size:50;not null;default:'scheduled'" json:"status"`
-	ComponentID  uint           `gorm:"not null" json:"component_id"`
-	Component    Component      `gorm:"foreignKey:ComponentID" json:"component,omitempty"`
+	// ComponentID is the main covered component, or nil for a general
+	// maintenance that covers no component.
+	ComponentID  *uint          `gorm:"index" json:"component_id"`
+	Component    *Component     `gorm:"foreignKey:ComponentID" json:"component,omitempty"`
 	StartAt      time.Time      `gorm:"not null" json:"start_at"`
 	EndAt        time.Time      `gorm:"not null" json:"end_at"`
 	// PreviousComponentStatus is superseded by MaintenanceComponent.
