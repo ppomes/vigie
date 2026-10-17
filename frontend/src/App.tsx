@@ -207,7 +207,15 @@ function IncidentsList() {
 
   useEffect(() => {
     getIncidents(i18n.language)
-      .then(setIncidents)
+      .then(list => {
+        setIncidents(list);
+        // Old Cachet incident links land on /#incident-<id>: scroll there
+        // once the list is on the page.
+        const target = window.location.hash.slice(1);
+        if (target.startsWith('incident-')) {
+          requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView());
+        }
+      })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [i18n.language]);
@@ -447,7 +455,7 @@ function SubscriptionForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="subscribe" onSubmit={handleSubmit} className="space-y-4">
       <div className="flex gap-2">
         <input
           type="email"
