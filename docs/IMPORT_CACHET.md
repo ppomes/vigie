@@ -68,8 +68,10 @@ out, with the reason:
   gets one an hour after its start; incident status 0, from Cachet 1.x,
   becomes resolved; a subscriber following only deleted components follows
   everything.
-- **Not imported**: rows deleted in Cachet, phone and Slack subscribers,
-  two-factor secrets.
+- **Not imported**: rows deleted in Cachet, phone and Slack subscribers.
+- **Two-factor login**: Cachet users who had it keep it, with the same entry in
+  their authenticator app. They have no recovery codes yet; the report reminds
+  you to ask them to make some.
 - **Not supported by Vigie**: metrics, incident templates (Cachet's use Twig),
   pending invitations.
 - **To do by hand**: such as setting `PUBLIC_URL` to the new address.

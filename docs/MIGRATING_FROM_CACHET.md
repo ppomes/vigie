@@ -49,8 +49,10 @@ Pay attention to:
 
 - **Users imported as viewers**: Cachet level 2 users. Make the ones who post
   incidents admins after the import.
-- **Rows not imported**: deleted rows, phone and Slack subscribers,
-  two-factor secrets, metrics and incident templates.
+- **Rows not imported**: deleted rows, phone and Slack subscribers, metrics
+  and incident templates.
+- **Two-factor login** carries over. Users who had it make recovery codes from
+  their profile.
 - **Text language**: Cachet's text is stored in one language. Use `--locale`
   if `app_locale` is not the language of your incidents.
 - **Timezone**: Cachet stores its dates in the zone of `APP_TIMEZONE`, in its
@@ -120,6 +122,5 @@ in Vigie in the meantime are not copied back to Cachet.
 - Metrics and their points.
 - Incident templates: Cachet's use Twig. Recreate them in Vigie.
 - Phone and Slack subscribers: Vigie sends email only.
-- Two-factor secrets: Vigie has no two-factor login yet.
 - A role between admin and viewer: Cachet level 2 users become viewers.
 - Cachet's "about" text and custom styles.

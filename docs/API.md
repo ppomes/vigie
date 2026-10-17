@@ -16,6 +16,7 @@ Base URL: `http://localhost:8080/api/v1`
 - [Admin Endpoints](#admin-endpoints)
   - [Authentication](#authentication-1)
   - [User Profile](#user-profile)
+  - [Two-Factor Login](#two-factor-login)
   - [Components Management](#components-management)
   - [Incidents Management](#incidents-management)
   - [Subscribers Management](#subscribers-management)
@@ -53,7 +54,7 @@ The following endpoints are rate-limited per IP address:
 
 | Endpoint | Limit | Window |
 |----------|-------|--------|
-| `POST /admin/login` | 5 requests | 15 minutes |
+| `POST /admin/login` | 10 requests | 15 minutes |
 | `POST /forgot-password` | 3 requests | 1 hour |
 | `POST /reset-password` | 3 requests | 1 hour |
 | `POST /subscribe` | 10 requests | 1 hour |
@@ -376,9 +377,24 @@ POST /admin/login
 }
 ```
 
+A user with two-factor login on must also send `code`: the six-digit code
+from their authenticator app, or one of their recovery codes. Without it, or
+with a wrong one, the answer is `401` with `"two_factor_required": true`, and
+the client asks for the code and sends the login again with it. Each code
+works once. A login with a recovery code also returns `recovery_codes_left`.
+
+```json
+{
+  "username": "admin",
+  "password": "your_password",
+  "code": "123456"
+}
+```
+
 **Error Responses:**
 
-- `401 Unauthorized`: Invalid credentials
+- `401 Unauthorized`: Invalid credentials, or two-factor code missing or wrong
+  (`two_factor_required` is then `true`)
 - `403 Forbidden`: Account deactivated
 - `429 Too Many Requests`: Rate limited
 
@@ -464,10 +480,14 @@ GET /admin/me
     "role": "admin",
     "active": true,
     "last_login": "2024-01-15T10:00:00Z",
-    "created_at": "2024-01-01T00:00:00Z"
+    "created_at": "2024-01-01T00:00:00Z",
+    "two_factor_enabled": true,
+    "recovery_codes_left": 8
   }
 }
 ```
+
+`recovery_codes_left` is only present when two-factor login is on.
 
 #### Change Own Password
 
@@ -493,6 +513,68 @@ PUT /admin/me/password
   "message": "Password changed successfully"
 }
 ```
+
+### Two-Factor Login
+
+Any user can turn on two-factor login (TOTP, the codes of Google
+Authenticator, 1Password, Aegis and similar apps). These endpoints need an
+interactive session: an API key cannot use them. API keys keep working
+without a code.
+
+#### Start the Setup
+
+```
+POST /admin/me/two-factor/setup
+```
+
+Request: `{"password": "current_password"}`. Returns a new secret, its
+`otpauth://` address, and a QR code of that address as a PNG data URL. Login
+does not change until the setup is confirmed. `409` if two-factor login is
+already on.
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+  "otpauth_url": "otpauth://totp/Vigie:admin?algorithm=SHA1&digits=6&issuer=Vigie&period=30&secret=...",
+  "qr_code": "data:image/png;base64,..."
+}
+```
+
+The app shows the status page's English title, or "Vigie", next to the code.
+
+#### Confirm the Setup
+
+```
+POST /admin/me/two-factor/enable
+```
+
+Request: `{"code": "123456"}`, a code from the app. Turns two-factor login on
+and returns eight recovery codes. They are shown only once; each one replaces a
+code once, for a user who lost their phone.
+
+```json
+{
+  "recovery_codes": ["7k2m9-x4q8d", "..."]
+}
+```
+
+#### New Recovery Codes
+
+```
+POST /admin/me/two-factor/recovery-codes
+```
+
+Request: `{"password": "current_password"}`. Replaces the recovery codes and
+returns the new ones.
+
+#### Turn Off
+
+```
+POST /admin/me/two-factor/disable
+```
+
+Request: `{"password": "current_password"}`. Turns two-factor login off and
+deletes the recovery codes.
 
 ---
 
@@ -1306,6 +1388,15 @@ PUT /admin/users/:id/password
 ```
 
 Sets `force_password_change` flag - user must change password on next login.
+
+#### Reset User Two-Factor Login
+
+```
+DELETE /admin/users/:id/two-factor
+```
+
+Turns two-factor login off for a user who lost their phone and their recovery
+codes. They can turn it on again from their profile.
 
 ---
 
