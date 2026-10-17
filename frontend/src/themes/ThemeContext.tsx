@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Theme, getThemeById, themes } from './index';
 import { getTheme as fetchTheme } from '../lib/api';
+import { setThemeCSS } from './styles';
 
 interface ThemeContextType {
   theme: Theme;
@@ -19,37 +20,37 @@ export function useTheme() {
 }
 
 function applyThemeCSS(theme: Theme) {
-  const root = document.documentElement;
   const { colors, styles } = theme;
+  const vars: Record<string, string> = {
+    '--color-background': colors.background,
+    '--color-card': colors.card,
+    '--color-card-border': colors.cardBorder,
+    '--color-text': colors.text,
+    '--color-text-muted': colors.textMuted,
+    '--color-primary': colors.primary,
+    '--color-primary-hover': colors.primaryHover,
+    '--color-header': colors.header,
+    '--color-header-text': colors.headerText,
 
-  // Apply colors as CSS variables
-  root.style.setProperty('--color-background', colors.background);
-  root.style.setProperty('--color-card', colors.card);
-  root.style.setProperty('--color-card-border', colors.cardBorder);
-  root.style.setProperty('--color-text', colors.text);
-  root.style.setProperty('--color-text-muted', colors.textMuted);
-  root.style.setProperty('--color-primary', colors.primary);
-  root.style.setProperty('--color-primary-hover', colors.primaryHover);
-  root.style.setProperty('--color-header', colors.header);
-  root.style.setProperty('--color-header-text', colors.headerText);
+    // Status colors
+    '--color-operational': colors.operational,
+    '--color-degraded': colors.degraded,
+    '--color-partial-outage': colors.partialOutage,
+    '--color-major-outage': colors.majorOutage,
+    '--color-investigating': colors.investigating,
+    '--color-identified': colors.identified,
+    '--color-monitoring': colors.monitoring,
+    '--color-resolved': colors.resolved,
 
-  // Status colors
-  root.style.setProperty('--color-operational', colors.operational);
-  root.style.setProperty('--color-degraded', colors.degraded);
-  root.style.setProperty('--color-partial-outage', colors.partialOutage);
-  root.style.setProperty('--color-major-outage', colors.majorOutage);
-  root.style.setProperty('--color-investigating', colors.investigating);
-  root.style.setProperty('--color-identified', colors.identified);
-  root.style.setProperty('--color-monitoring', colors.monitoring);
-  root.style.setProperty('--color-resolved', colors.resolved);
+    // Styles
+    '--card-radius': styles.cardRadius,
+    '--card-shadow': styles.shadow,
+  };
 
-  // Styles
-  root.style.setProperty('--card-radius', styles.cardRadius);
-  root.style.setProperty('--card-shadow', styles.shadow);
-
-  // Apply body background
-  document.body.style.backgroundColor = colors.background;
-  document.body.style.color = colors.text;
+  // A style element rather than inline styles on <html>, so that the
+  // admin's custom CSS can override these variables.
+  const decls = Object.entries(vars).map(([name, value]) => `  ${name}: ${value};`).join('\n');
+  setThemeCSS(`:root {\n${decls}\n}\nbody {\n  background-color: var(--color-background);\n  color: var(--color-text);\n}\n`);
 }
 
 interface ThemeProviderProps {

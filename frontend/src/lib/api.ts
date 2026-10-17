@@ -146,6 +146,18 @@ export async function getBranding(): Promise<BrandingSettings> {
   return fetchAPI<BrandingSettings>('/settings/branding');
 }
 
+// Customization is the admin's custom CSS, header and footer. The API has
+// already sanitized the HTML.
+export interface Customization {
+  css: string;
+  header_html: string;
+  footer_html: string;
+}
+
+export async function getCustomization(): Promise<Customization> {
+  return fetchAPI<Customization>('/settings/customization');
+}
+
 export async function getMaintenances(locale: string = 'en'): Promise<Maintenance[]> {
   const response = await fetchAPI<{ maintenances: Maintenance[] }>(`/maintenances?locale=${locale}`);
   return response.maintenances || [];

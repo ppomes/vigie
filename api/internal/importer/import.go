@@ -676,8 +676,10 @@ func (im *importer) subscribers() error {
 // applySettings carries the page name over as the Vigie title, and lists
 // the settings to redo by hand.
 func (im *importer) applySettings() error {
-	if name := strings.TrimSpace(im.settings["app_name"]); name != "" {
-		branding, err := json.Marshal(map[string]string{"title_en": name, "title_fr": name})
+	name := strings.TrimSpace(im.settings["app_name"])
+	logo := im.cachetBanner()
+	if name != "" || logo != "" {
+		branding, err := json.Marshal(map[string]string{"title_en": name, "title_fr": name, "logo": logo})
 		if err != nil {
 			return err
 		}
@@ -690,10 +692,13 @@ func (im *importer) applySettings() error {
 			}
 			im.report.imported("settings")
 		case err == nil:
-			im.report.note("Vigie already has a branding: the Cachet page name %q was not applied.", name)
+			im.report.note("Vigie already has a branding: the Cachet page name and banner were not applied.")
 		default:
 			return err
 		}
+	}
+	if err := im.customizationFromCachet(); err != nil {
+		return err
 	}
 	if d := im.settings["app_domain"]; d != "" {
 		im.report.note("Cachet was served at %s: set PUBLIC_URL to the address of the Vigie status page.", d)

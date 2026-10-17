@@ -123,4 +123,6 @@ in Vigie in the meantime are not copied back to Cachet.
 - Incident templates: Cachet's use Twig. Recreate them in Vigie.
 - Phone and Slack subscribers: Vigie sends email only.
 - A role between admin and viewer: Cachet level 2 users become viewers.
-- Cachet's "about" text and custom styles.
+- Cachet's "about" text.
+- Custom styles carry over, but Cachet's stylesheet targets Cachet's HTML:
+  check it under Settings, Customization.
