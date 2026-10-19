@@ -13,6 +13,7 @@ type Translation struct {
 	Locale     string         `gorm:"size:5;not null;index:idx_entity_locale" json:"locale"`                          // en, fr
 	Field      string         `gorm:"size:50;not null" json:"field"`                                                  // name, message, description
 	Value      string         `gorm:"type:text" json:"value"`
+	Machine    bool           `gorm:"not null;default:0" json:"machine"` // made by a model at import, until edited
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
