@@ -116,6 +116,7 @@ export interface Component {
   enabled: boolean;
   meta?: Record<string, string>;
   tags?: { id: number; name: string; slug: string }[];
+  translations?: Translation[];
 }
 
 // Body of a component create or update. tags are names.
@@ -147,6 +148,10 @@ export interface Translation {
   locale: string;
   field: string;
   value: string;
+  // made by a language model at import, until someone edits it or marks it reviewed
+  machine?: boolean;
+  // sent back to accept a machine translation as it is
+  reviewed?: boolean;
 }
 
 // Fields accepted when creating or updating an incident. component_status,

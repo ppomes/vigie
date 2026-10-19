@@ -58,20 +58,7 @@ func validateUpdateMessages(translations []TranslationRequest, required bool) st
 
 // replaceUpdateTranslations stores the messages of an update.
 func replaceUpdateTranslations(tx *gorm.DB, updateID uint, translations []TranslationRequest) error {
-	if err := tx.Unscoped().Where("entity_id = ? AND entity_type = ?", updateID, "incident_update").
-		Delete(&models.Translation{}).Error; err != nil {
-		return err
-	}
-	for _, t := range translations {
-		if strings.TrimSpace(t.Value) == "" {
-			continue
-		}
-		tr := models.Translation{EntityID: updateID, EntityType: "incident_update", Locale: t.Locale, Field: t.Field, Value: t.Value}
-		if err := tx.Create(&tr).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+	return replaceTranslations(tx, "incident_update", updateID, translations, true)
 }
 
 // syncIncidentStatus sets the incident status to that of its latest update.

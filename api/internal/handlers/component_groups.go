@@ -40,17 +40,7 @@ func validateGroupTranslations(translations []TranslationRequest) string {
 }
 
 func replaceGroupTranslations(tx *gorm.DB, groupID uint, translations []TranslationRequest) error {
-	if err := tx.Unscoped().Where("entity_id = ? AND entity_type = ?", groupID, "component_group").
-		Delete(&models.Translation{}).Error; err != nil {
-		return err
-	}
-	for _, t := range translations {
-		tr := models.Translation{EntityID: groupID, EntityType: "component_group", Locale: t.Locale, Field: t.Field, Value: t.Value}
-		if err := tx.Create(&tr).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+	return replaceTranslations(tx, "component_group", groupID, translations, false)
 }
 
 // ListComponentGroups returns all groups with their components, in order.

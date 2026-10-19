@@ -135,6 +135,8 @@ type TranslationRequest struct {
 	Locale string `json:"locale" binding:"required,oneof=en fr"`
 	Field  string `json:"field" binding:"required"`
 	Value  string `json:"value" binding:"required"`
+	// Reviewed accepts a machine translation as it is.
+	Reviewed bool `json:"reviewed"`
 }
 
 // CreateComponent handles the creation of a new component
@@ -276,27 +278,10 @@ func UpdateComponent(db *gorm.DB) gin.HandlerFunc {
 
 		// Update translations if provided
 		if len(req.Translations) > 0 {
-			// Delete existing translations for the component
-			if err := tx.Unscoped().Where("entity_id = ? AND entity_type = ?", component.ID, "component").Delete(&models.Translation{}).Error; err != nil {
+			if err := replaceTranslations(tx, "component", component.ID, req.Translations, false); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update translations"})
 				return
-			}
-
-			// Create new translations
-			for _, t := range req.Translations {
-				translation := models.Translation{
-					EntityID:   component.ID,
-					EntityType: "component",
-					Locale:     t.Locale,
-					Field:      t.Field,
-					Value:      t.Value,
-				}
-				if err := tx.Create(&translation).Error; err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create translations"})
-					return
-				}
 			}
 		}
 
@@ -559,27 +544,10 @@ func UpdateIncident(db *gorm.DB, notificationService *services.NotificationServi
 
 		// Update translations if provided
 		if len(req.Translations) > 0 {
-			// Delete existing translations for the incident
-			if err := tx.Unscoped().Where("entity_id = ? AND entity_type = ?", incident.ID, "incident").Delete(&models.Translation{}).Error; err != nil {
+			if err := replaceTranslations(tx, "incident", incident.ID, req.Translations, false); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update translations"})
 				return
-			}
-
-			// Create new translations
-			for _, t := range req.Translations {
-				translation := models.Translation{
-					EntityID:   incident.ID,
-					EntityType: "incident",
-					Locale:     t.Locale,
-					Field:      t.Field,
-					Value:      t.Value,
-				}
-				if err := tx.Create(&translation).Error; err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create translations"})
-					return
-				}
 			}
 		}
 
