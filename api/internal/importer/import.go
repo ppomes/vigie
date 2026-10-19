@@ -750,6 +750,9 @@ func (im *importer) applySettings() error {
 	if im.translations == nil {
 		im.report.note("Text from Cachet was stored in %q: add the other language in the admin where needed.", im.locale)
 	}
+	if im.locale != "en" {
+		im.report.note("Set CACHET_API_LOCALE=%s, so that integrations using the Cachet compatible API get the text in %q.", im.locale, im.locale)
+	}
 	im.reportTranslations()
 	return im.pageLanguage()
 }

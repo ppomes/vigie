@@ -121,7 +121,8 @@ func TestImportWithTranslation(t *testing.T) {
 	if dns := translationsOf(t, dst, "incident", 2); len(dns) != 1 {
 		t.Errorf("failed incident: %+v", dns)
 	}
-	if !strings.Contains(out.String(), "texts could not be translated") || !strings.Contains(out.String(), "made by fake") {
+	if !strings.Contains(out.String(), "texts could not be translated") || !strings.Contains(out.String(), "made by fake") ||
+		!strings.Contains(out.String(), "CACHET_API_LOCALE=fr") {
 		t.Errorf("report: %s", out.String())
 	}
 

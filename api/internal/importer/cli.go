@@ -131,9 +131,11 @@ func RunCLI(args []string, target func() (*gorm.DB, error), out io.Writer) int {
 
 	var translations *Translations
 	if *translateText {
+		// Ctrl-C stops the translation; the cache keeps what was done. The
+		// signals are released before the import, which they end at once.
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer stop()
 		translations, err = translateSource(ctx, src, *locale, zone, *translatorURL, *translatorModel, *cachePath, since, out)
+		stop()
 		if err != nil {
 			fmt.Fprintf(out, "Translation failed, nothing was written: %v\n", err)
 			return 1
