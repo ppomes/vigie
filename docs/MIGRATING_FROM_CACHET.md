@@ -53,11 +53,14 @@ Pay attention to:
   and incident templates.
 - **Two-factor login** carries over. Users who had it make recovery codes from
   their profile.
-- **Text language**: Cachet's text is stored in one language. Use `--locale`
-  if `app_locale` is not the language of your incidents. The public page is
-  set to show that language to every visitor, so pages do not mix languages;
-  visitors can still switch. Change it under Settings, Public Page Language
-  once incidents are written in both languages.
+- **Text language**: Cachet's text is stored in one language: the one most of
+  it is written in, or `--locale`. The public page is set to show that
+  language to every visitor, so pages do not mix languages; visitors can
+  still switch. Change it under Settings, Public Page Language once incidents
+  are written in both languages. To have the other language from the start,
+  translate the text with a local model during the import:
+  `scripts/import-cachet.sh ... --translate`, see
+  [Translating Cachet's text](IMPORT_CACHET.md#translating-cachets-text).
 - **Timezone**: Cachet stores its dates in the zone of `APP_TIMEZONE`, in its
   `.env` file, not in its database. If it is not `UTC`, add
   `--source-timezone` with that value, for example

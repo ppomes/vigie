@@ -1570,7 +1570,8 @@ Components, incidents, and maintenances support translations for multilingual co
 {
   "locale": "en",
   "field": "name",
-  "value": "API Server"
+  "value": "API Server",
+  "machine": false
 }
 ```
 
@@ -1579,6 +1580,12 @@ Components, incidents, and maintenances support translations for multilingual co
 | `locale` | string | Language code: `en` or `fr` |
 | `field` | string | Field name: `name`, `message`, `description` |
 | `value` | string | Translated content |
+| `machine` | boolean | Read only: made by a language model at import (`import-cachet --translate`), until it is edited or reviewed |
+| `reviewed` | boolean | Write only, optional: `true` accepts a machine translation as it is |
+
+Updating an entity replaces its translations. A machine translation sent back
+with the same value keeps `machine: true`; a changed value, or `reviewed:
+true`, clears it.
 
 ### Supported Locales
 

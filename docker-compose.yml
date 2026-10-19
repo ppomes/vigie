@@ -134,6 +134,20 @@ services:
       retries: 3
       start_period: 10s
 
+  # =============================================================================
+  # Ollama: a local language model, only used to translate Cachet's text
+  # during the import (scripts/import-cachet.sh --translate). Not started by
+  # "docker compose up": it is in the translate profile.
+  # =============================================================================
+  ollama:
+    image: ollama/ollama:0.40.6
+    container_name: statuspage-ollama
+    profiles: ["translate"]
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - statuspage-network
+
 # =============================================================================
 # Volumes
 # =============================================================================
@@ -141,6 +155,9 @@ volumes:
   mysql_data:
     driver: local
     name: statuspage-mysql-data
+  ollama_models:
+    driver: local
+    name: statuspage-ollama-models
 
 # =============================================================================
 # Networks
