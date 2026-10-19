@@ -3,6 +3,7 @@ module api
 go 1.23
 
 require (
+	github.com/abadojack/whatlanggo v1.0.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/glebarez/sqlite v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.0

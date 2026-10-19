@@ -254,28 +254,10 @@ func UpdateMaintenance(db *gorm.DB, notificationService *services.NotificationSe
 
 		// Update translations if provided
 		if len(req.Translations) > 0 {
-			// Delete existing translations
-			if err := tx.Unscoped().Where("entity_id = ? AND entity_type = ?", maintenance.ID, "maintenance").
-				Delete(&models.Translation{}).Error; err != nil {
+			if err := replaceTranslations(tx, "maintenance", maintenance.ID, req.Translations, false); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update translations"})
 				return
-			}
-
-			// Create new translations
-			for _, t := range req.Translations {
-				translation := models.Translation{
-					EntityID:   maintenance.ID,
-					EntityType: "maintenance",
-					Locale:     t.Locale,
-					Field:      t.Field,
-					Value:      t.Value,
-				}
-				if err := tx.Create(&translation).Error; err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create translations"})
-					return
-				}
 			}
 		}
 

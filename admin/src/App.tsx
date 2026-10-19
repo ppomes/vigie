@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext, Fragment } from 'react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey, IncidentUpdateInput, ComponentGroup } from './lib/api';
+import { api, Component, Incident, Subscriber, EmailConfig, BrandingConfig, IncidentTemplate, TemplateVariable, NotificationQueueStats, QueuedNotification, Maintenance, MaintenanceTemplate, User, AuditLog, APIKey, IncidentUpdateInput, ComponentGroup, Translation } from './lib/api';
 import TwoFactorModal from './pages/TwoFactor';
 import CustomizationSection from './pages/Customization';
 import PageLanguageSection from './pages/PageLanguage';
@@ -23,7 +23,39 @@ const themes = [
   { id: 'modern', name: 'Modern', description: 'Gradient accents, rounded cards', preview: 'bg-gradient-to-r from-indigo-500 to-purple-500' },
 ];
 
-const emptyComponentForm = { name: '', status: 'operational', order: 0, group_id: 0, link: '', enabled: true, tags: '' };
+const emptyComponentForm = {
+  name: '', status: 'operational', order: 0, group_id: 0, link: '', enabled: true, tags: '',
+  name_en: '', name_fr: '', description_en: '', description_fr: '',
+};
+
+// Translations made by a language model at import are marked until someone
+// edits them, or ticks "Reviewed" in the form. start() takes the
+// translations of the entity being edited; note() shows the mark under a
+// field holding one unchanged; mark() flags the ticked ones for the API.
+function useMachineReview() {
+  const [original, setOriginal] = useState<Translation[]>([]);
+  const [reviewed, setReviewed] = useState<string[]>([]);
+  const start = (translations?: Translation[]) => {
+    setOriginal(translations || []);
+    setReviewed([]);
+  };
+  const note = (field: string, locale: string, value: string) => {
+    const t = original.find(t => t.field === field && t.locale === locale);
+    if (!t?.machine || !value || t.value !== value) return null;
+    const key = `${field}/${locale}`;
+    return (
+      <label className="flex items-center gap-1 text-xs text-amber-700 mt-1">
+        <input type="checkbox" checked={reviewed.includes(key)}
+          onChange={e => setReviewed(e.target.checked ? [...reviewed, key] : reviewed.filter(k => k !== key))} />
+        Machine translation: tick once reviewed, or edit it
+      </label>
+    );
+  };
+  const mark = <T extends { field: string; locale: string }>(translations: T[]) =>
+    translations.map(t => (reviewed.includes(`${t.field}/${t.locale}`) ? { ...t, reviewed: true } : t));
+  return { start, note, mark };
+}
+
 
 function ComponentsPage() {
   const [components, setComponents] = useState<Component[]>([]);
@@ -32,6 +64,7 @@ function ComponentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyComponentForm);
+  const review = useMachineReview();
 
   useEffect(() => { loadComponents(); }, []);
 
@@ -49,7 +82,13 @@ function ComponentsPage() {
     e.preventDefault();
     try {
       // group_id 0 means "no group"; tags are typed comma-separated
-      const data = { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) };
+      const { name_en, name_fr, description_en, description_fr, ...fields } = form;
+      const translations: Translation[] = [];
+      if (name_en.trim()) translations.push({ locale: 'en', field: 'name', value: name_en });
+      if (name_fr.trim()) translations.push({ locale: 'fr', field: 'name', value: name_fr });
+      if (description_en.trim()) translations.push({ locale: 'en', field: 'description', value: description_en });
+      if (description_fr.trim()) translations.push({ locale: 'fr', field: 'description', value: description_fr });
+      const data = { ...fields, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), translations: review.mark(translations) };
       if (editId) {
         await api.updateComponent(editId, data);
       } else {
@@ -65,10 +104,15 @@ function ComponentsPage() {
   };
 
   const handleEdit = (c: Component) => {
+    const translation = (field: string, locale: string) =>
+      c.translations?.find(t => t.field === field && t.locale === locale)?.value || '';
     setForm({
       name: c.name, status: c.status, order: c.order, group_id: c.group_id || 0,
       link: c.link || '', enabled: c.enabled, tags: (c.tags || []).map(t => t.name).join(', '),
+      name_en: translation('name', 'en'), name_fr: translation('name', 'fr'),
+      description_en: translation('description', 'en'), description_fr: translation('description', 'fr'),
     });
+    review.start(c.translations);
     setEditId(c.id);
     setShowForm(true);
   };
@@ -85,7 +129,7 @@ function ComponentsPage() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Components</h2>
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm(emptyComponentForm); }}
+        <button onClick={() => { setShowForm(true); setEditId(null); setForm(emptyComponentForm); review.start(); }}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
           Add Component
         </button>
@@ -116,6 +160,28 @@ function ComponentsPage() {
               <input type="checkbox" checked={form.enabled} onChange={e => setForm({...form, enabled: e.target.checked})} />
               Shown on the status page
             </label>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <input type="text" placeholder="Name (English)" value={form.name_en} onChange={e => setForm({...form, name_en: e.target.value})}
+                className="w-full border rounded px-3 py-2" />
+              {review.note('name', 'en', form.name_en)}
+            </div>
+            <div>
+              <input type="text" placeholder="Name (French)" value={form.name_fr} onChange={e => setForm({...form, name_fr: e.target.value})}
+                className="w-full border rounded px-3 py-2" />
+              {review.note('name', 'fr', form.name_fr)}
+            </div>
+            <div>
+              <textarea placeholder="Description (English)" value={form.description_en} onChange={e => setForm({...form, description_en: e.target.value})}
+                className="w-full border rounded px-3 py-2" rows={2} />
+              {review.note('description', 'en', form.description_en)}
+            </div>
+            <div>
+              <textarea placeholder="Description (French)" value={form.description_fr} onChange={e => setForm({...form, description_fr: e.target.value})}
+                className="w-full border rounded px-3 py-2" rows={2} />
+              {review.note('description', 'fr', form.description_fr)}
+            </div>
           </div>
           <div className="mt-4 flex gap-2">
             <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
@@ -171,6 +237,7 @@ function ComponentGroupsSection({ groups, onChange }: { groups: ComponentGroup[]
   const [editId, setEditId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyGroupForm);
+  const review = useMachineReview();
 
   const translation = (g: ComponentGroup, locale: string) =>
     g.translations?.find(t => t.field === 'name' && t.locale === locale)?.value || '';
@@ -180,7 +247,7 @@ function ComponentGroupsSection({ groups, onChange }: { groups: ComponentGroup[]
     const translations: { locale: string; field: 'name'; value: string }[] = [];
     if (form.name_en.trim()) translations.push({ locale: 'en', field: 'name', value: form.name_en });
     if (form.name_fr.trim()) translations.push({ locale: 'fr', field: 'name', value: form.name_fr });
-    const data = { name: form.name, order: form.order, collapse: form.collapse, visibility: form.visibility, translations };
+    const data = { name: form.name, order: form.order, collapse: form.collapse, visibility: form.visibility, translations: review.mark(translations) };
     try {
       if (editId) {
         await api.updateComponentGroup(editId, data);
@@ -198,6 +265,7 @@ function ComponentGroupsSection({ groups, onChange }: { groups: ComponentGroup[]
 
   const handleEdit = (g: ComponentGroup) => {
     setForm({ name: g.name, name_en: translation(g, 'en'), name_fr: translation(g, 'fr'), order: g.order, collapse: g.collapse, visibility: g.visibility });
+    review.start(g.translations);
     setEditId(g.id);
     setShowForm(true);
   };
@@ -218,7 +286,7 @@ function ComponentGroupsSection({ groups, onChange }: { groups: ComponentGroup[]
     <div className="mt-8">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Component groups</h2>
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm(emptyGroupForm); }}
+        <button onClick={() => { setShowForm(true); setEditId(null); setForm(emptyGroupForm); review.start(); }}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
           Add Group
         </button>
@@ -229,10 +297,16 @@ function ComponentGroupsSection({ groups, onChange }: { groups: ComponentGroup[]
           <div className="grid grid-cols-3 gap-4">
             <input type="text" placeholder="Name (default)" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
               className="border rounded px-3 py-2" required maxLength={255} />
-            <input type="text" placeholder="Name (English)" value={form.name_en} onChange={e => setForm({...form, name_en: e.target.value})}
-              className="border rounded px-3 py-2" />
-            <input type="text" placeholder="Name (French)" value={form.name_fr} onChange={e => setForm({...form, name_fr: e.target.value})}
-              className="border rounded px-3 py-2" />
+            <div>
+              <input type="text" placeholder="Name (English)" value={form.name_en} onChange={e => setForm({...form, name_en: e.target.value})}
+                className="w-full border rounded px-3 py-2" />
+              {review.note('name', 'en', form.name_en)}
+            </div>
+            <div>
+              <input type="text" placeholder="Name (French)" value={form.name_fr} onChange={e => setForm({...form, name_fr: e.target.value})}
+                className="w-full border rounded px-3 py-2" />
+              {review.note('name', 'fr', form.name_fr)}
+            </div>
             <input type="number" placeholder="Order" value={form.order} onChange={e => setForm({...form, order: parseInt(e.target.value) || 0})}
               className="border rounded px-3 py-2" />
             <select value={form.collapse} onChange={e => setForm({...form, collapse: e.target.value as ComponentGroup['collapse']})} className="border rounded px-3 py-2">
@@ -385,8 +459,10 @@ function IncidentTimeline({ incident, onChange }: { incident: Incident; onChange
   const [componentStatus, setComponentStatus] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const message = (u: { translations?: { locale: string; field: string; value: string }[] }, locale: string) =>
+  const message = (u: { translations?: Translation[] }, locale: string) =>
     u.translations?.find(t => t.field === 'message' && t.locale === locale)?.value;
+  const machine = (u: { translations?: Translation[] }, locale: string) =>
+    u.translations?.some(t => t.field === 'message' && t.locale === locale && t.machine);
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -436,8 +512,12 @@ function IncidentTimeline({ incident, onChange }: { incident: Incident; onChange
               </span>
               {isAdmin && <button onClick={() => handleDelete(u.id)} className="text-red-500">Delete</button>}
             </div>
-            {message(u, 'en') && <p><span className="text-gray-500">EN:</span> {message(u, 'en')}</p>}
-            {message(u, 'fr') && <p><span className="text-gray-500">FR:</span> {message(u, 'fr')}</p>}
+            {(['en', 'fr'] as const).map(l => message(u, l) && (
+              <p key={l}>
+                <span className="text-gray-500">{l.toUpperCase()}:</span> {message(u, l)}
+                {machine(u, l) && <span className="ml-2 text-xs text-amber-700">machine translation</span>}
+              </p>
+            ))}
           </li>
         ))}
       </ul>
@@ -543,6 +623,7 @@ function IncidentsPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<{ name_en: string; name_fr: string; message_en: string; message_fr: string } | null>(null);
+  const review = useMachineReview();
 
   useEffect(() => {
     Promise.all([api.getIncidents(), api.getComponents(), api.getTemplates()]).then(([i, c, t]) => {
@@ -615,7 +696,7 @@ function IncidentsPage() {
           component_status: form.component_status || undefined,
           components: affectedComponents(form),
           ...incidentOptions(form, !editId),
-          translations: buildTranslations(),
+          translations: review.mark(buildTranslations()),
         };
       }
 
@@ -656,6 +737,7 @@ function IncidentsPage() {
       message_en: getTranslation('message', 'en'),
       message_fr: getTranslation('message', 'fr'),
     });
+    review.start(i.translations);
     setEditId(i.id);
     setMode('freeform');
     setShowForm(true);
@@ -860,21 +942,25 @@ function IncidentsPage() {
                     <label className="block text-sm text-gray-600 mb-1">Name (English)</label>
                     <input type="text" placeholder="English name" value={form.name_en} onChange={e => setForm({...form, name_en: e.target.value})}
                       className="w-full border rounded px-3 py-2" />
+                      {review.note('name', 'en', form.name_en)}
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">Name (French)</label>
                     <input type="text" placeholder="French name" value={form.name_fr} onChange={e => setForm({...form, name_fr: e.target.value})}
                       className="w-full border rounded px-3 py-2" />
+                      {review.note('name', 'fr', form.name_fr)}
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">Message (English)</label>
                     <textarea placeholder="English message" value={form.message_en} onChange={e => setForm({...form, message_en: e.target.value})}
                       className="w-full border rounded px-3 py-2" rows={3} />
+                      {review.note('message', 'en', form.message_en)}
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">Message (French)</label>
                     <textarea placeholder="French message" value={form.message_fr} onChange={e => setForm({...form, message_fr: e.target.value})}
                       className="w-full border rounded px-3 py-2" rows={3} />
+                      {review.note('message', 'fr', form.message_fr)}
                   </div>
                 </div>
               </div>
@@ -1963,6 +2049,7 @@ function MaintenancesPage() {
   const [templateVariables, setTemplateVariables] = useState<TemplateVariable[]>([]);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<{ name_en: string; name_fr: string; message_en: string; message_fr: string } | null>(null);
+  const review = useMachineReview();
 
   interface MaintenanceForm {
     name: string;
@@ -2083,7 +2170,7 @@ function MaintenancesPage() {
       component_ids: form.extra_component_ids.filter(id => id !== form.component_id),
       start_at: form.start_at,
       end_at: form.end_at,
-      translations: buildTranslations(),
+      translations: review.mark(buildTranslations()),
     };
     try {
       if (editId) {
@@ -2115,6 +2202,7 @@ function MaintenancesPage() {
       message_en: getTranslation('message', 'en'),
       message_fr: getTranslation('message', 'fr'),
     });
+    review.start(m.translations);
     setEditId(m.id);
     setUseTemplate(false);
     setShowForm(true);
@@ -2235,6 +2323,7 @@ function MaintenancesPage() {
                     onChange={e => setForm({ ...form, name_en: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                   />
+                  {review.note('name', 'en', form.name_en)}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Name (FR)</label>
@@ -2244,6 +2333,7 @@ function MaintenancesPage() {
                     onChange={e => setForm({ ...form, name_fr: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                   />
+                  {review.note('name', 'fr', form.name_fr)}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -2255,6 +2345,7 @@ function MaintenancesPage() {
                     className="w-full border rounded px-3 py-2"
                     rows={3}
                   />
+                  {review.note('message', 'en', form.message_en)}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Message (FR)</label>
@@ -2264,6 +2355,7 @@ function MaintenancesPage() {
                     className="w-full border rounded px-3 py-2"
                     rows={3}
                   />
+                  {review.note('message', 'fr', form.message_fr)}
                 </div>
               </div>
             </>

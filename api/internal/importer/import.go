@@ -30,6 +30,9 @@ type Options struct {
 	// SourceTimezone is the zone Cachet wrote its dates in: its APP_TIMEZONE
 	// variable. Nil means UTC, Cachet's default.
 	SourceTimezone *time.Location
+	// Translations, from Translate, adds the other languages of the page
+	// to Cachet's text. Nil imports the text in its language only.
+	Translations *Translations
 }
 
 // errDryRun rolls the transaction back at the end of a dry run.
@@ -50,7 +53,14 @@ func Import(opts Options) (*Report, error) {
 		return nil, err
 	}
 	err = opts.Target.Transaction(func(tx *gorm.DB) error {
-		im := &importer{src: src, dst: tx, report: report, locale: opts.Locale, zone: opts.SourceTimezone}
+		im := &importer{src: src, dst: tx, report: report, locale: opts.Locale, zone: opts.SourceTimezone,
+			translations: opts.Translations}
+		if im.locale == "" && opts.Translations != nil {
+			im.locale = opts.Translations.Locale
+			if opts.Translations.LocaleNote != "" {
+				report.note("%s", opts.Translations.LocaleNote)
+			}
+		}
 		if err := im.run(); err != nil {
 			return err
 		}
@@ -74,6 +84,8 @@ type importer struct {
 	locale   string
 	zone     *time.Location
 	settings map[string]string
+	// translations is nil when the text is imported in its language only.
+	translations *Translations
 
 	components map[uint]bool // ids of imported components
 	users      map[uint]uint // Cachet user id to Vigie user id
@@ -162,9 +174,13 @@ func (im *importer) readSettings() error {
 	}
 	im.checkZone()
 	if im.locale == "" {
-		im.locale = "en"
-		if l := strings.ToLower(im.settings["app_locale"]); strings.HasPrefix(l, "fr") {
-			im.locale = "fr"
+		locale, note, err := pageLocale(im.src, "")
+		if err != nil {
+			return err
+		}
+		im.locale = locale
+		if note != "" {
+			im.report.note("%s", note)
 		}
 	}
 	return nil
@@ -191,11 +207,17 @@ func (im *importer) create(value any, defaultTrue map[string]bool) error {
 	return im.dst.Model(value).UpdateColumns(falses).Error
 }
 
-func (im *importer) translate(entityType string, id uint, field string, value *string) error {
+// translate stores a text of Cachet that Vigie keeps as a translation, under
+// the language it is written in, with the model's translations, if any.
+func (im *importer) translate(entityType string, id uint, field, kind string, value *string) error {
 	if value == nil || strings.TrimSpace(*value) == "" {
 		return nil
 	}
-	return im.dst.Create(&models.Translation{EntityID: id, EntityType: entityType, Locale: im.locale, Field: field, Value: *value}).Error
+	if err := im.dst.Create(&models.Translation{EntityID: id, EntityType: entityType, Locale: im.textLang(kind, *value),
+		Field: field, Value: *value}).Error; err != nil {
+		return err
+	}
+	return im.machineTranslations(entityType, id, field, kind, *value)
 }
 
 func timeOr(t *time.Time, fallback time.Time) time.Time {
@@ -225,6 +247,9 @@ func (im *importer) groups() error {
 		ng := models.ComponentGroup{ID: g.ID, Name: g.Name, Order: g.Order, Collapse: c, Visibility: visibility,
 			CreatedAt: timeOr(g.CreatedAt, now), UpdatedAt: timeOr(g.UpdatedAt, now)}
 		if err := im.create(&ng, nil); err != nil {
+			return err
+		}
+		if err := im.machineTranslations("component_group", g.ID, "name", kindGroupName, g.Name); err != nil {
 			return err
 		}
 		im.report.imported("component groups")
@@ -289,7 +314,10 @@ func (im *importer) componentsAndTags() error {
 		if err := im.create(&nc, map[string]bool{"enabled": c.Enabled}); err != nil {
 			return err
 		}
-		if err := im.translate("component", c.ID, "description", c.Description); err != nil {
+		if err := im.machineTranslations("component", c.ID, "name", kindComponentName, c.Name); err != nil {
+			return err
+		}
+		if err := im.translate("component", c.ID, "description", kindComponentDesc, c.Description); err != nil {
 			return err
 		}
 		im.components[c.ID] = true
@@ -460,7 +488,10 @@ func (im *importer) incidents() error {
 		if err := im.create(&ni, map[string]bool{"visible": i.Visible, "notifications": i.Notifications}); err != nil {
 			return err
 		}
-		if err := im.translate("incident", i.ID, "message", i.Message); err != nil {
+		if err := im.machineTranslations("incident", i.ID, "name", kindIncidentName, i.Name); err != nil {
+			return err
+		}
+		if err := im.translate("incident", i.ID, "message", kindIncidentMessage, i.Message); err != nil {
 			return err
 		}
 		if componentID != nil {
@@ -527,7 +558,7 @@ func (im *importer) incidents() error {
 		if err := im.create(&nu, nil); err != nil {
 			return err
 		}
-		if err := im.translate("incident_update", u.ID, "message", u.Message); err != nil {
+		if err := im.translate("incident_update", u.ID, "message", kindUpdateMessage, u.Message); err != nil {
 			return err
 		}
 		im.report.imported("incident updates")
@@ -587,7 +618,10 @@ func (im *importer) schedules() error {
 		if err := im.create(&nm, nil); err != nil {
 			return err
 		}
-		if err := im.translate("maintenance", s.ID, "message", s.Message); err != nil {
+		if err := im.machineTranslations("maintenance", s.ID, "name", kindMaintenanceName, s.Name); err != nil {
+			return err
+		}
+		if err := im.translate("maintenance", s.ID, "message", kindMaintenanceMessage, s.Message); err != nil {
 			return err
 		}
 		for _, id := range ids {
@@ -680,7 +714,13 @@ func (im *importer) applySettings() error {
 	name := strings.TrimSpace(im.settings["app_name"])
 	logo := im.cachetBanner()
 	if name != "" || logo != "" {
-		branding, err := json.Marshal(map[string]string{"title_en": name, "title_fr": name, "logo": logo})
+		titles := map[string]string{"title_en": name, "title_fr": name, "logo": logo}
+		if e, ok := im.translations.get(kindPageTitle, name); ok {
+			for locale, v := range e.values {
+				titles["title_"+locale] = v
+			}
+		}
+		branding, err := json.Marshal(titles)
 		if err != nil {
 			return err
 		}
@@ -707,7 +747,13 @@ func (im *importer) applySettings() error {
 	if im.settings["app_about"] != "" {
 		im.report.note("The Cachet \"about\" text has no equivalent in Vigie and was not imported.")
 	}
-	im.report.note("Text from Cachet was stored in %q: add the other language in the admin where needed.", im.locale)
+	if im.translations == nil {
+		im.report.note("Text from Cachet was stored in %q: add the other language in the admin where needed.", im.locale)
+	}
+	if im.locale != "en" {
+		im.report.note("Set CACHET_API_LOCALE=%s, so that integrations using the Cachet compatible API get the text in %q.", im.locale, im.locale)
+	}
+	im.reportTranslations()
 	return im.pageLanguage()
 }
 
@@ -758,6 +804,17 @@ func (im *importer) pageLanguage() error {
 	}
 	if exists {
 		im.report.note("Vigie already has a page language setting: it was kept. Cachet's text is in %q.", im.locale)
+		return nil
+	}
+	if im.translations != nil {
+		// The text now exists in every language of the page.
+		if err := language.Save(im.dst, language.Settings{Default: im.locale, Mode: language.ModeBrowser}); err != nil {
+			return err
+		}
+		im.report.imported("settings")
+		im.report.note("The public page now follows the visitor's browser, with %q for other languages, since the text was translated. "+
+			"To show %q to every visitor until the translations are reviewed, choose \"Always the default language\" under Settings, Public page language.",
+			im.locale, im.locale)
 		return nil
 	}
 	if err := language.Save(im.dst, language.Settings{Default: im.locale, Mode: language.ModeFixed}); err != nil {

@@ -144,6 +144,8 @@ CREATE TABLE IF NOT EXISTS translations (
     locale VARCHAR(5) NOT NULL DEFAULT 'en',
     field VARCHAR(50) NOT NULL,
     value TEXT,
+    -- made by a language model at import, until someone edits it
+    machine BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_translations_entity (entity_id, entity_type),
